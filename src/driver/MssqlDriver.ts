@@ -42,7 +42,10 @@ export class MssqlDriver implements SqlDriver {
             execute: (sql: string, params: unknown[] = []) => tx.query(sql, params),
         };
         try { const r = await fn(tx); await transaction.commit(); return r; }
-        catch (err) { await transaction.rollback(); throw err; }
+        catch (err) {
+            try { await transaction.rollback(); } catch { /* ignore secondary rollback error */ }
+            throw err;
+        }
     }
     async end(): Promise<void> { const pool = await this.poolPromise; await pool.close(); }
 }
