@@ -20,6 +20,11 @@ export { getValue, getString, getNumber, getBoolean, getColumn, findRow, filterR
 export { rows, ResultSet, Row } from './result/ResultSet';
 export { ResultError } from './exceptions/SqlException';
 
+// Row matchers
+export type { Matcher } from './result/matchers';
+export { eq, ne, lt, lte, gt, gte, between, oneOf, like, contains, startsWith, endsWith, matches, isNull, notNull, not } from './result/matchers';
+export type { RowPredicate } from './result/accessors';
+
 // Logger
 export { log, createLogger } from './logger/Logger';
 
