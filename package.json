@@ -1,7 +1,7 @@
 {
   "name": "@civitas-cerebrum/sql-client",
-  "version": "0.0.1",
-  "description": "A lightweight Postgres client library with a fluent query builder, typed results, and parametrised queries.",
+  "version": "0.1.0",
+  "description": "A lightweight multi-engine SQL client (Postgres, MySQL, SQLite, SQL Server, Oracle) with a fluent query builder, typed results, and parametrised queries.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -9,7 +9,14 @@
     "build": "npm run clean && tsc",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "test": "npx tsx tests/dialect.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/sql-client.test.ts",
+    "test:unit": "npx tsx tests/dialects.test.ts && npx tsx tests/pagination.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/engine-detection.test.ts",
+    "test:sqlite": "npx tsx tests/integration/sqlite.test.ts",
+    "test:postgres": "npx tsx tests/integration/postgres.test.ts",
+    "test:mysql": "npx tsx tests/integration/mysql.test.ts",
+    "test:mssql": "npx tsx tests/integration/mssql.test.ts",
+    "test:oracle": "npx tsx tests/integration/oracle.test.ts",
+    "test": "npm run test:unit && npm run test:sqlite",
+    "test:all-engines": "npm run test:unit && npm run test:postgres && npm run test:sqlite && npm run test:mysql && npm run test:mssql && npm run test:oracle",
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build"
   },
@@ -19,8 +26,7 @@
     "scripts/postinstall.js"
   ],
   "dependencies": {
-    "debug": "^4.4.3",
-    "pg": "^8.13.0"
+    "debug": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -33,23 +39,28 @@
     "mssql": "^12.5.5",
     "mysql2": "^3.22.4",
     "oracledb": "^7.0.0",
+    "pg": "^8.13.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
+    "pg": "*",
+    "mysql2": "*",
     "better-sqlite3": "*",
     "mssql": "*",
-    "mysql2": "*",
     "oracledb": "*"
   },
   "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
     "better-sqlite3": {
       "optional": true
     },
     "mssql": {
-      "optional": true
-    },
-    "mysql2": {
       "optional": true
     },
     "oracledb": {
@@ -58,10 +69,15 @@
   },
   "keywords": [
     "postgres",
+    "mysql",
+    "sqlite",
+    "mssql",
+    "oracle",
     "sql",
     "query-builder",
     "database",
-    "test-automation"
+    "test-automation",
+    "multi-engine"
   ],
   "publishConfig": {
     "access": "public"
