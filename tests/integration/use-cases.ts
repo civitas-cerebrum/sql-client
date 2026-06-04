@@ -31,55 +31,11 @@ import assert from 'node:assert/strict';
 import { SqlClient } from '../../src/client/SqlClient';
 import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { QueryFailedException } from '../../src/exceptions/SqlException';
+import { ph, col, num, statusCol, bindDate } from './_helpers';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Case-insensitive column accessor (Oracle returns UPPERCASE keys). */
-export function col(row: Record<string, unknown>, name: string): unknown {
-    return row[name] ?? row[name.toUpperCase()];
-}
-
-/** Coerce pg/mysql NUMERIC/DECIMAL strings to number. */
-export function num(v: unknown): number {
-    return Number(v);
-}
-
-// ---------------------------------------------------------------------------
-// Engine-specific rendering helpers (used only where unavoidable)
-// ---------------------------------------------------------------------------
-
-/**
- * The `status` column in the `orders` table is a reserved word in T-SQL and
- * must be bracketed in INSERT column lists for MSSQL. SELECT/WHERE work fine
- * without brackets on all engines.
- *
- * Per-engine override: mssql only.
- */
-function statusCol(engine: string): string {
-    return engine === 'mssql' ? '[status]' : 'status';
-}
-
-/**
- * Bind a single placeholder at position `i` (1-based).
- * Thin wrapper around `client.dialect.placeholder(i)`.
- */
-function ph(client: SqlClient, i: number): string {
-    return client.dialect.placeholder(i);
-}
-
-/**
- * Return a date value suitable for binding as a timestamp parameter.
- *
- * Per-engine override: SQLite (better-sqlite3) rejects Date objects; it only
- * accepts numbers, strings, bigints, buffers, and null. All other engines
- * accept a JS Date object and map it to the correct timestamp type. For
- * Oracle the oracledb driver handles Date→TIMESTAMP WITH TIME ZONE correctly.
- */
-function bindDate(client: SqlClient, iso: string): unknown {
-    return client.engine === 'sqlite' ? iso : new Date(iso);
-}
+// Re-export col/num so any existing consumer that imports from use-cases.ts
+// continues to compile without changes.
+export { col, num } from './_helpers';
 
 // ---------------------------------------------------------------------------
 // Main harness

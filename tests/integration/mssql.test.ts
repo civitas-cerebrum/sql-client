@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SqlClient } from '../../src/client/SqlClient';
 import { runUseCases } from './use-cases';
+import { runLookups } from './lookups';
+import { runBuilderCases } from './builder-cases';
 
 const BASE_CONFIG = {
     engine: 'mssql' as const,
@@ -35,6 +37,8 @@ async function main() {
     }
 
     await runUseCases(client);
+    await runLookups(client);
+    await runBuilderCases(client);
     await client.end();
     console.log('integration/mssql.test.ts PASSED');
 }

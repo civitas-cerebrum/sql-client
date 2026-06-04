@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { SqlClient } from '../../src/client/SqlClient';
 import { runUseCases } from './use-cases';
+import { runLookups } from './lookups';
+import { runBuilderCases } from './builder-cases';
 
 async function main() {
     const db = new SqlClient({ engine: 'sqlite', connectionString: ':memory:' });
@@ -15,6 +17,8 @@ async function main() {
     }
 
     await runUseCases(db);
+    await runLookups(db);
+    await runBuilderCases(db);
     await db.end();
     console.log('integration/sqlite.test.ts PASSED');
 }
