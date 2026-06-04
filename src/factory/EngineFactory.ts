@@ -6,6 +6,7 @@ import { PostgresFactory } from './PostgresFactory';
 import { SqliteFactory } from './SqliteFactory';
 import { MySqlFactory } from './MySqlFactory';
 import { MssqlFactory } from './MssqlFactory';
+import { OracleFactory } from './OracleFactory';
 
 /** Abstract Factory: produces the matching driver + dialect family for one engine. */
 export interface EngineFactory {
@@ -18,7 +19,7 @@ const registry: Partial<Record<SqlEngine, EngineFactory>> = {
     sqlite: new SqliteFactory(),
     mysql: new MySqlFactory(),
     mssql: new MssqlFactory(),
-    // oracle registered in its own task
+    oracle: new OracleFactory(),
 };
 
 export function registerEngineFactory(engine: SqlEngine, factory: EngineFactory): void {

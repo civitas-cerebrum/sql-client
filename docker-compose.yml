@@ -46,3 +46,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 40
+
+  sql-client-oracle:
+    image: gvenzl/oracle-free:slim
+    profiles: ["oracle", "all"]
+    environment:
+      ORACLE_PASSWORD: bookhive
+      APP_USER: bookhive
+      APP_USER_PASSWORD: bookhive
+    ports: ["1521:1521"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
