@@ -2,6 +2,7 @@
 export class SqlException extends Error {
     constructor(message: string) {
         super(message);
+        Object.setPrototypeOf(this, new.target.prototype);
         this.name = 'SqlException';
     }
 }
@@ -12,9 +13,10 @@ export class QueryFailedException extends SqlException {
         message: string,
         public readonly sql: string,
         public readonly params: unknown[],
-        public readonly cause?: unknown,
+        cause?: unknown,
     ) {
         super(message);
+        if (cause !== undefined) (this as { cause?: unknown }).cause = cause;
         this.name = 'QueryFailedException';
     }
 }
