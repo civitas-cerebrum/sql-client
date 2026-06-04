@@ -21,6 +21,7 @@
 import assert from 'node:assert/strict';
 import { SqlClient } from '../../src/client/SqlClient';
 import { ph, col, num, conditionCol, bindDate } from './_helpers';
+import { rows } from '../../src/result/ResultSet';
 
 export async function runLookups(client: SqlClient): Promise<void> {
 
@@ -33,13 +34,13 @@ export async function runLookups(client: SqlClient): Promise<void> {
         const sql = `SELECT title, author, genre, price, stock, isbn FROM books WHERE book_id = ${ph(client, 1)}`;
         const result = await client.query<Record<string, unknown>>(sql, ['book-001']);
         assert.equal(result.rowCount, 1, `L-B1: rowCount should be 1, got ${result.rowCount}`);
-        const row = result.rows[0];
-        assert.equal(String(col(row, 'title')), 'To Kill a Mockingbird', `L-B1: title mismatch`);
-        assert.equal(String(col(row, 'author')), 'Harper Lee', `L-B1: author mismatch`);
-        assert.equal(String(col(row, 'genre')), 'Fiction', `L-B1: genre mismatch`);
-        assert.equal(num(col(row, 'price')), 12.99, `L-B1: price mismatch`);
-        assert.equal(num(col(row, 'stock')), 15, `L-B1: stock mismatch`);
-        assert.equal(String(col(row, 'isbn')), '978-0-06-112008-4', `L-B1: isbn mismatch`);
+        const book = rows(result).one();
+        assert.equal(book.string('title'), 'To Kill a Mockingbird', 'L-B1: title');
+        assert.equal(book.string('author'), 'Harper Lee', 'L-B1: author');
+        assert.equal(book.string('genre'), 'Fiction', 'L-B1: genre');
+        assert.equal(book.number('price'), 12.99, 'L-B1: price');
+        assert.equal(book.number('stock'), 15, 'L-B1: stock');
+        assert.equal(book.string('isbn'), '978-0-06-112008-4', `L-B1: isbn mismatch`);
     }
 
     // L-B2: book-006 genre=Non-Fiction, price=18.99
@@ -74,8 +75,7 @@ export async function runLookups(client: SqlClient): Promise<void> {
         const sql = `SELECT title FROM books WHERE genre = ${ph(client, 1)} ORDER BY title`;
         const result = await client.query<Record<string, unknown>>(sql, ['Non-Fiction']);
         assert.equal(result.rowCount, 2, `L-B5: expected 2 Non-Fiction books, got ${result.rowCount}`);
-        const titles = result.rows.map((r) => String(col(r, 'title')));
-        assert.deepEqual(titles, ['Educated', 'Sapiens'], `L-B5: titles mismatch: ${JSON.stringify(titles)}`);
+        assert.deepEqual(rows(result).column('title').map(String), ['Educated', 'Sapiens'], `L-B5: titles mismatch`);
     }
 
     // L-B6: scalar stock of book-008 → 25
@@ -105,8 +105,8 @@ export async function runLookups(client: SqlClient): Promise<void> {
     // L-B9: count(*) → 8
     {
         const sql = 'SELECT COUNT(*) AS cnt FROM books';
-        const result = await client.query<Record<string, unknown>>(sql);
-        assert.equal(num(col(result.rows[0], 'cnt')), 8, `L-B9: expected 8 books`);
+        const countResult = await client.query<Record<string, unknown>>(sql);
+        assert.equal(Number(rows(countResult).scalar()), 8, `L-B9: expected 8 books`);
     }
 
     // ==========================================================================

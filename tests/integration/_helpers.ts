@@ -7,6 +7,7 @@
  */
 
 import { SqlClient } from '../../src/client/SqlClient';
+import { getValue } from '../../src/result/accessors';
 
 // ---------------------------------------------------------------------------
 // Parametrisation helpers
@@ -24,22 +25,8 @@ export function ph(client: SqlClient, i: number): string {
 // Column accessor / coercion
 // ---------------------------------------------------------------------------
 
-/**
- * Case-insensitive column accessor (Oracle returns UPPERCASE keys).
- *
- * Behaviour:
- *  - Key present with any case → return the value (may be null).
- *  - Key genuinely absent → return undefined.
- *
- * The distinction matters for NULL-assertion tests: a present-NULL value
- * must come back as `null`, not be confused with an absent column.
- */
-export function col(row: Record<string, unknown>, name: string): unknown {
-    if (name in row) return row[name];
-    const upper = name.toUpperCase();
-    if (upper in row) return row[upper];
-    return undefined;
-}
+/** Case-insensitive column accessor — re-exported from the package's getValue. */
+export const col = getValue;
 
 /** Coerce pg/mysql NUMERIC/DECIMAL strings to number. */
 export function num(v: unknown): number {
