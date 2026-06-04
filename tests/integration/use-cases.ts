@@ -121,32 +121,26 @@ export async function runUseCases(client: SqlClient): Promise<void> {
     // title is '1984' (alphabetically first Fiction book).
     // -----------------------------------------------------------------------
     {
-        const result = await QueryBuilder
+        const qb3 = QueryBuilder
             .select('books')
             .columns('title', 'price')
             .where('genre = ?', 'Fiction')
             .orderBy('title')
-            .limit(2)
-            .run(client);
+            .limit(2);
+        // Confirm dialect-correct pagination in the compiled SQL text
+        const { text } = qb3.toSql(client.dialect);
+        if (e === 'mssql' || e === 'oracle') {
+            assert.ok(text.includes('FETCH NEXT'), `UC3: expected OFFSET..FETCH in SQL, got: ${text}`);
+        } else {
+            assert.ok(text.includes('LIMIT'), `UC3: expected LIMIT in SQL, got: ${text}`);
+        }
+        const result = await qb3.run(client);
         assert.equal(result.rowCount, 2, `UC3: expected 2 rows, got ${result.rowCount}`);
         assert.equal(
             String(col(result.rows[0] as Record<string, unknown>, 'title')),
             '1984',
             `UC3: expected first title='1984', got '${col(result.rows[0] as Record<string, unknown>, 'title')}'`,
         );
-        // Confirm dialect-correct pagination in the compiled SQL text
-        const { text } = QueryBuilder
-            .select('books')
-            .columns('title', 'price')
-            .where('genre = ?', 'Fiction')
-            .orderBy('title')
-            .limit(2)
-            .toSql(client.dialect);
-        if (e === 'mssql' || e === 'oracle') {
-            assert.ok(text.includes('FETCH NEXT'), `UC3: expected OFFSET..FETCH in SQL, got: ${text}`);
-        } else {
-            assert.ok(text.includes('LIMIT'), `UC3: expected LIMIT in SQL, got: ${text}`);
-        }
     }
 
     // -----------------------------------------------------------------------
@@ -193,6 +187,37 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         assert.equal(byGenre['Fiction'], 3, `UC5: Fiction units expected 3, got ${byGenre['Fiction']}`);
         assert.equal(byGenre['Fantasy'], 2, `UC5: Fantasy units expected 2, got ${byGenre['Fantasy']}`);
         assert.equal(byGenre['Non-Fiction'], 1, `UC5: Non-Fiction units expected 1, got ${byGenre['Non-Fiction']}`);
+    }
+
+    // -----------------------------------------------------------------------
+    // Use case 5b — QueryBuilder GROUP BY + HAVING, live end-to-end
+    // Seed: book-001=1, book-003=2, book-006=1, book-008=2.
+    // HAVING SUM(quantity) >= 2 → book-003 and book-008 (ordered by book_id ASC).
+    // -----------------------------------------------------------------------
+    {
+        const agg = await QueryBuilder
+            .select('order_items')
+            .columns('book_id', 'SUM(quantity) AS units')
+            .groupBy('book_id')
+            .having('SUM(quantity) >= ?', 2)
+            .orderBy('book_id')
+            .run(client);
+        assert.equal(agg.rowCount, 2, `UC5b: expected 2 rows with SUM(quantity)>=2, got ${agg.rowCount}`);
+        assert.equal(
+            String(col(agg.rows[0] as Record<string, unknown>, 'book_id')),
+            'book-003',
+            `UC5b: expected first book_id='book-003', got '${col(agg.rows[0] as Record<string, unknown>, 'book_id')}'`,
+        );
+        assert.equal(
+            num(col(agg.rows[0] as Record<string, unknown>, 'units')),
+            2,
+            `UC5b: expected first units=2, got ${num(col(agg.rows[0] as Record<string, unknown>, 'units'))}`,
+        );
+        assert.equal(
+            String(col(agg.rows[1] as Record<string, unknown>, 'book_id')),
+            'book-008',
+            `UC5b: expected second book_id='book-008', got '${col(agg.rows[1] as Record<string, unknown>, 'book_id')}'`,
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -439,9 +464,9 @@ export async function runUseCases(client: SqlClient): Promise<void> {
                     `UPDATE books SET stock = stock - 1 WHERE book_id = ${ph(client, 1)}`,
                     ['book-002'],
                 );
-                throw new Error('deliberate rollback');
+                throw new Error('boom');
             }),
-            `UC12: expected transaction to reject`,
+            /boom/,
         );
 
         const after = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
