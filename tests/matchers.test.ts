@@ -75,4 +75,18 @@ assert.equal(filterRows(books, (r) => Number(r.price) < 10).length, 2);
 assert.equal(findRow(books, (r) => r.genre === 'Non-Fiction')?.book_id, 'book-006');
 
 console.log('matchers.test.ts accessors PASSED');
+
+import { rows } from '../src/result/ResultSet';
+
+const result = { rows: books, rowCount: 3, fields: [{ name: 'book_id', dataTypeID: 0 }] };
+
+// matcher partial via the wrapper
+assert.equal(rows(result).where({ genre: 'Fiction', price: lt(10) }).length, 2);
+assert.equal(rows(result).find({ price: gte(15) })?.get('book_id'), 'book-006');
+
+// Row predicate overload
+assert.equal(rows(result).where((row) => row.number('price')! < 10).length, 2);
+assert.equal(rows(result).find((row) => row.string('genre') === 'Non-Fiction')?.get('book_id'), 'book-006');
+
+console.log('matchers.test.ts wrapper PASSED');
 console.log('matchers.test.ts PASSED');

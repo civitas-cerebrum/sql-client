@@ -49,12 +49,19 @@ export class ResultSet<T extends Record<string, unknown> = Record<string, unknow
         return name === undefined ? undefined : (getValue(row, name) as V | null | undefined);
     }
     column(name: string): unknown[] { return getColumn(this._rows, name); }
-    find(partial: Record<string, unknown>): Row | undefined {
-        const r = findRow(this._rows, partial);
+    find(where: Record<string, unknown> | ((row: Row) => boolean)): Row | undefined {
+        if (typeof where === 'function') {
+            const r = this._rows.find((row) => where(new Row(row)));
+            return r ? new Row(r) : undefined;
+        }
+        const r = findRow(this._rows, where);
         return r ? new Row(r) : undefined;
     }
-    where(partial: Record<string, unknown>): Row[] {
-        return filterRows(this._rows, partial).map((r) => new Row(r));
+    where(where: Record<string, unknown> | ((row: Row) => boolean)): Row[] {
+        if (typeof where === 'function') {
+            return this._rows.filter((row) => where(new Row(row))).map((r) => new Row(r));
+        }
+        return filterRows(this._rows, where).map((r) => new Row(r));
     }
     map<R>(fn: (row: Row, index: number) => R): R[] {
         return this._rows.map((r, i) => fn(new Row(r), i));
