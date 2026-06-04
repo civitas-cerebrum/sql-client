@@ -6,6 +6,7 @@ interface WhereFrag { clause: string; params: unknown[]; }
 
 /** Minimal client shape QueryBuilder needs to dispatch via `.run()`. */
 export interface RunnableClient {
+    dialect: Dialect;
     query<T>(sql: string, params?: unknown[]): Promise<SqlResult<T>>;
     execute(sql: string, params?: unknown[]): Promise<SqlResult>;
 }
@@ -127,7 +128,7 @@ export class QueryBuilder {
 
     /** Dispatch through a client: SELECT → query, everything else → execute. */
     async run<T = Record<string, unknown>>(client: RunnableClient): Promise<SqlResult<T>> {
-        const { text, values } = this.toSql();
+        const { text, values } = this.toSql(client.dialect);
         return this.kind === 'select'
             ? client.query<T>(text, values)
             : (client.execute(text, values) as Promise<SqlResult<T>>);
