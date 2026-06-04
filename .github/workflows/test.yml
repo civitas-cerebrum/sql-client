@@ -1,0 +1,42 @@
+name: 🧪 Test, Verify & Coverage
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🗂️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: 🧩 Install dependencies
+        run: npm ci
+
+      - name: 🔒 Vulnerability audit
+        run: npm audit --audit-level=high
+
+      - name: 🛠️ Build package
+        run: npm run build
+
+      # CI runs the zero-infra suite (compilation unit tests + the in-process SQLite
+      # integration). The full five-engine live matrix (postgres/mysql/mssql/oracle)
+      # is run locally via `docker compose --profile all up -d --wait && npm run test:all-engines`.
+      - name: 🧪 Run Unit + SQLite Tests
+        run: npm test
+
+      - name: 📝 Check Types
+        run: npx tsc --noEmit
