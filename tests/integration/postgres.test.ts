@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { SqlClient } from '../src/client/SqlClient';
-import { QueryBuilder } from '../src/builder/QueryBuilder';
-import { QueryFailedException } from '../src/exceptions/SqlException';
+import { SqlClient } from '../../src/client/SqlClient';
+import { QueryBuilder } from '../../src/builder/QueryBuilder';
+import { QueryFailedException } from '../../src/exceptions/SqlException';
 
 const CONN = process.env.SQL_TEST_URL ?? 'postgres://bookhive:bookhive@localhost:5432/bookhive';
 
@@ -52,7 +52,7 @@ async function main() {
     await client.execute('UPDATE books SET stock = 15 WHERE book_id = $1', ['book-001']);
 
     await client.end();
-    console.log('sql-client.test.ts PASSED');
+    console.log('integration/postgres.test.ts PASSED');
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
