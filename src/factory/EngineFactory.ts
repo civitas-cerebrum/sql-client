@@ -4,6 +4,7 @@ import { Dialect } from '../builder/Dialect';
 import { UnsupportedEngineException } from '../exceptions/SqlException';
 import { PostgresFactory } from './PostgresFactory';
 import { SqliteFactory } from './SqliteFactory';
+import { MySqlFactory } from './MySqlFactory';
 
 /** Abstract Factory: produces the matching driver + dialect family for one engine. */
 export interface EngineFactory {
@@ -14,7 +15,8 @@ export interface EngineFactory {
 const registry: Partial<Record<SqlEngine, EngineFactory>> = {
     postgres: new PostgresFactory(),
     sqlite: new SqliteFactory(),
-    // mysql/mssql/oracle registered in their own tasks
+    mysql: new MySqlFactory(),
+    // mssql/oracle registered in their own tasks
 };
 
 export function registerEngineFactory(engine: SqlEngine, factory: EngineFactory): void {

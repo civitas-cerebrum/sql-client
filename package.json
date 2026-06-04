@@ -28,14 +28,21 @@
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
     "better-sqlite3": "^12.10.0",
+    "mysql2": "^3.22.4",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "better-sqlite3": "*"
+    "better-sqlite3": "*",
+    "mysql2": "*"
   },
   "peerDependenciesMeta": {
-    "better-sqlite3": { "optional": true }
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    }
   },
   "keywords": [
     "postgres",

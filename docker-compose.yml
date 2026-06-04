@@ -15,3 +15,21 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+
+  sql-client-mysql:
+    image: mysql:8
+    profiles: ["mysql", "all"]
+    environment:
+      MYSQL_DATABASE: bookhive
+      MYSQL_USER: bookhive
+      MYSQL_PASSWORD: bookhive
+      MYSQL_ROOT_PASSWORD: rootpw
+    ports: ["3306:3306"]
+    volumes:
+      - ./tests/sql/mysql.schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./tests/sql/mysql.seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ubookhive", "-pbookhive"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
