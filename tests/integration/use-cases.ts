@@ -281,50 +281,54 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             .run(client);
         assert.equal(insResult.rowCount, 1, `UC9 INSERT: expected rowCount=1, got ${insResult.rowCount}`);
 
-        // SELECT-back confirms row exists
-        const selResult = await QueryBuilder
-            .select('cart_items')
-            .where('cart_item_id = ?', tempId)
-            .run(client);
-        assert.equal(selResult.rowCount, 1, `UC9 SELECT-back: expected 1 row, got ${selResult.rowCount}`);
-        assert.equal(
-            num(col(selResult.rows[0] as Record<string, unknown>, 'quantity')),
-            3,
-            `UC9 SELECT-back: expected quantity=3`,
-        );
+        try {
+            // SELECT-back confirms row exists
+            const selResult = await QueryBuilder
+                .select('cart_items')
+                .where('cart_item_id = ?', tempId)
+                .run(client);
+            assert.equal(selResult.rowCount, 1, `UC9 SELECT-back: expected 1 row, got ${selResult.rowCount}`);
+            assert.equal(
+                num(col(selResult.rows[0] as Record<string, unknown>, 'quantity')),
+                3,
+                `UC9 SELECT-back: expected quantity=3`,
+            );
 
-        // UPDATE
-        const updResult = await QueryBuilder
-            .update('cart_items')
-            .set({ quantity: 7 })
-            .where('cart_item_id = ?', tempId)
-            .run(client);
-        assert.equal(updResult.rowCount, 1, `UC9 UPDATE: expected rowCount=1, got ${updResult.rowCount}`);
+            // UPDATE
+            const updResult = await QueryBuilder
+                .update('cart_items')
+                .set({ quantity: 7 })
+                .where('cart_item_id = ?', tempId)
+                .run(client);
+            assert.equal(updResult.rowCount, 1, `UC9 UPDATE: expected rowCount=1, got ${updResult.rowCount}`);
 
-        // Verify UPDATE took effect
-        const selAfterUpd = await QueryBuilder
-            .select('cart_items')
-            .where('cart_item_id = ?', tempId)
-            .run(client);
-        assert.equal(
-            num(col(selAfterUpd.rows[0] as Record<string, unknown>, 'quantity')),
-            7,
-            `UC9 UPDATE verify: expected quantity=7`,
-        );
+            // Verify UPDATE took effect
+            const selAfterUpd = await QueryBuilder
+                .select('cart_items')
+                .where('cart_item_id = ?', tempId)
+                .run(client);
+            assert.equal(
+                num(col(selAfterUpd.rows[0] as Record<string, unknown>, 'quantity')),
+                7,
+                `UC9 UPDATE verify: expected quantity=7`,
+            );
 
-        // DELETE
-        const delResult = await QueryBuilder
-            .delete('cart_items')
-            .where('cart_item_id = ?', tempId)
-            .run(client);
-        assert.equal(delResult.rowCount, 1, `UC9 DELETE: expected rowCount=1, got ${delResult.rowCount}`);
+            // DELETE
+            const delResult = await QueryBuilder
+                .delete('cart_items')
+                .where('cart_item_id = ?', tempId)
+                .run(client);
+            assert.equal(delResult.rowCount, 1, `UC9 DELETE: expected rowCount=1, got ${delResult.rowCount}`);
 
-        // Verify DELETE removed the row
-        const selAfterDel = await QueryBuilder
-            .select('cart_items')
-            .where('cart_item_id = ?', tempId)
-            .run(client);
-        assert.equal(selAfterDel.rowCount, 0, `UC9 DELETE verify: expected 0 rows, got ${selAfterDel.rowCount}`);
+            // Verify DELETE removed the row
+            const selAfterDel = await QueryBuilder
+                .select('cart_items')
+                .where('cart_item_id = ?', tempId)
+                .run(client);
+            assert.equal(selAfterDel.rowCount, 0, `UC9 DELETE verify: expected 0 rows, got ${selAfterDel.rowCount}`);
+        } finally {
+            await QueryBuilder.delete('cart_items').where('cart_item_id = ?', tempId).run(client).catch(() => {});
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -347,9 +351,13 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         ]);
         assert.equal(insResult.rowCount, 1, `UC10 INSERT: expected rowCount=1, got ${insResult.rowCount}`);
 
-        const delSQL = `DELETE FROM cart_items WHERE cart_item_id = ${ph(client, 1)}`;
-        const delResult = await client.execute(delSQL, [tempId]);
-        assert.equal(delResult.rowCount, 1, `UC10 DELETE: expected rowCount=1, got ${delResult.rowCount}`);
+        try {
+            const delSQL = `DELETE FROM cart_items WHERE cart_item_id = ${ph(client, 1)}`;
+            const delResult = await client.execute(delSQL, [tempId]);
+            assert.equal(delResult.rowCount, 1, `UC10 DELETE: expected rowCount=1, got ${delResult.rowCount}`);
+        } finally {
+            await client.execute(`DELETE FROM cart_items WHERE cart_item_id = ${ph(client, 1)}`, [tempId]).catch(() => {});
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -380,20 +388,23 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             ]);
         });
 
-        // Verify committed stock
         const stockSQL = `SELECT stock FROM books WHERE book_id = ${ph(client, 1)}`;
-        const stockResult = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
-        assert.equal(
-            num(col(stockResult.rows[0], 'stock')),
-            11,
-            `UC11 COMMIT: expected stock=11, got ${num(col(stockResult.rows[0], 'stock'))}`,
-        );
 
-        // Clean up: delete temp order and restore stock
-        const delOrdSQL = `DELETE FROM orders WHERE order_id = ${ph(client, 1)}`;
-        await client.execute(delOrdSQL, [tempOrderId]);
-        const restoreSQL = `UPDATE books SET stock = 12 WHERE book_id = ${ph(client, 1)}`;
-        await client.execute(restoreSQL, ['book-002']);
+        try {
+            // Verify committed stock
+            const stockResult = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
+            assert.equal(
+                num(col(stockResult.rows[0], 'stock')),
+                11,
+                `UC11 COMMIT: expected stock=11, got ${num(col(stockResult.rows[0], 'stock'))}`,
+            );
+        } finally {
+            // Clean up: delete temp order and restore stock
+            const delOrdSQL = `DELETE FROM orders WHERE order_id = ${ph(client, 1)}`;
+            await client.execute(delOrdSQL, [tempOrderId]).catch(() => {});
+            const restoreSQL = `UPDATE books SET stock = 12 WHERE book_id = ${ph(client, 1)}`;
+            await client.execute(restoreSQL, ['book-002']).catch(() => {});
+        }
 
         // Confirm cleanup
         const finalStock = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);

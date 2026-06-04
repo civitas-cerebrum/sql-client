@@ -18,16 +18,13 @@
  *   requires ORDER BY on those engines (included).
  * - For limit-only: mssql/oracle produce `OFFSET 0 ROWS FETCH NEXT N ROWS ONLY`
  *   — the check looks for `FETCH NEXT` rather than `LIMIT`.
- * - The `condition` column in marketplace_listings is handled via a raw
- *   expression in `.columns()` — quoteColumn passes through strings that
- *   contain spaces or AS, so `'item_condition AS book_condition'` is safe.
  * - Only `books` and `cart_items` are used for CRUD (no reserved-word columns).
  */
 
 import assert from 'node:assert/strict';
 import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { SqlClient } from '../../src/client/SqlClient';
-import { col, num, conditionCol, bindDate } from './_helpers';
+import { col, num } from './_helpers';
 
 export async function runBuilderCases(client: SqlClient): Promise<void> {
     const e = client.engine;
@@ -304,49 +301,53 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .run(client);
         assert.equal(insResult.rowCount, 1, `BC-14 INSERT: expected rowCount=1, got ${insResult.rowCount}`);
 
-        // SELECT-back
-        const selResult = await QueryBuilder
-            .select('books')
-            .columns('title', 'price', 'stock')
-            .where('book_id = ?', tempId)
-            .run(client);
-        assert.equal(selResult.rowCount, 1, `BC-14 SELECT-back: expected 1 row`);
-        const row = selResult.rows[0] as Record<string, unknown>;
-        assert.equal(String(col(row, 'title')), 'Builder Test Book', `BC-14 SELECT-back: title mismatch`);
-        assert.equal(num(col(row, 'price')), 3.99, `BC-14 SELECT-back: price should be 3.99`);
-        assert.equal(num(col(row, 'stock')), 5, `BC-14 SELECT-back: stock should be 5`);
+        try {
+            // SELECT-back
+            const selResult = await QueryBuilder
+                .select('books')
+                .columns('title', 'price', 'stock')
+                .where('book_id = ?', tempId)
+                .run(client);
+            assert.equal(selResult.rowCount, 1, `BC-14 SELECT-back: expected 1 row`);
+            const row = selResult.rows[0] as Record<string, unknown>;
+            assert.equal(String(col(row, 'title')), 'Builder Test Book', `BC-14 SELECT-back: title mismatch`);
+            assert.equal(num(col(row, 'price')), 3.99, `BC-14 SELECT-back: price should be 3.99`);
+            assert.equal(num(col(row, 'stock')), 5, `BC-14 SELECT-back: stock should be 5`);
 
-        // UPDATE
-        const updResult = await QueryBuilder
-            .update('books')
-            .set({ price: 4.99, stock: 10 })
-            .where('book_id = ?', tempId)
-            .run(client);
-        assert.equal(updResult.rowCount, 1, `BC-14 UPDATE: expected rowCount=1, got ${updResult.rowCount}`);
+            // UPDATE
+            const updResult = await QueryBuilder
+                .update('books')
+                .set({ price: 4.99, stock: 10 })
+                .where('book_id = ?', tempId)
+                .run(client);
+            assert.equal(updResult.rowCount, 1, `BC-14 UPDATE: expected rowCount=1, got ${updResult.rowCount}`);
 
-        // Verify UPDATE took effect
-        const selAfterUpd = await QueryBuilder
-            .select('books')
-            .columns('price', 'stock')
-            .where('book_id = ?', tempId)
-            .run(client);
-        const updRow = selAfterUpd.rows[0] as Record<string, unknown>;
-        assert.equal(num(col(updRow, 'price')), 4.99, `BC-14 UPDATE verify: price should be 4.99`);
-        assert.equal(num(col(updRow, 'stock')), 10, `BC-14 UPDATE verify: stock should be 10`);
+            // Verify UPDATE took effect
+            const selAfterUpd = await QueryBuilder
+                .select('books')
+                .columns('price', 'stock')
+                .where('book_id = ?', tempId)
+                .run(client);
+            const updRow = selAfterUpd.rows[0] as Record<string, unknown>;
+            assert.equal(num(col(updRow, 'price')), 4.99, `BC-14 UPDATE verify: price should be 4.99`);
+            assert.equal(num(col(updRow, 'stock')), 10, `BC-14 UPDATE verify: stock should be 10`);
 
-        // DELETE
-        const delResult = await QueryBuilder
-            .delete('books')
-            .where('book_id = ?', tempId)
-            .run(client);
-        assert.equal(delResult.rowCount, 1, `BC-14 DELETE: expected rowCount=1, got ${delResult.rowCount}`);
+            // DELETE
+            const delResult = await QueryBuilder
+                .delete('books')
+                .where('book_id = ?', tempId)
+                .run(client);
+            assert.equal(delResult.rowCount, 1, `BC-14 DELETE: expected rowCount=1, got ${delResult.rowCount}`);
 
-        // Verify DELETE removed the row
-        const selAfterDel = await QueryBuilder
-            .select('books')
-            .where('book_id = ?', tempId)
-            .run(client);
-        assert.equal(selAfterDel.rowCount, 0, `BC-14 DELETE verify: expected 0 rows`);
+            // Verify DELETE removed the row
+            const selAfterDel = await QueryBuilder
+                .select('books')
+                .where('book_id = ?', tempId)
+                .run(client);
+            assert.equal(selAfterDel.rowCount, 0, `BC-14 DELETE verify: expected 0 rows`);
+        } finally {
+            await QueryBuilder.delete('books').where('book_id = ?', tempId).run(client).catch(() => {});
+        }
     }
 
     // ==========================================================================
