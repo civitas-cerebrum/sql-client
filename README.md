@@ -105,6 +105,26 @@ getNumber(res.rows[0], 'price');              // 12.99
 
 Semantics: absent column → `undefined`; SQL NULL → `null`; otherwise coerced.
 
+### Filtering rows
+
+`where`/`find` accept a partial (column → literal **or** matcher) or a full-row predicate:
+
+```ts
+import { rows, lt, oneOf, contains } from '@civitas-cerebrum/sql-client';
+
+const res = await db.query('SELECT * FROM books');
+rows(res).where({ genre: 'Fiction', price: lt(10) });        // matchers
+rows(res).find({ title: contains('1984') });
+rows(res).where(row => row.number('price')! < 10);           // predicate
+
+// standalone, on raw rows
+import { filterRows } from '@civitas-cerebrum/sql-client';
+filterRows(res.rows, { status: oneOf(['ACTIVE', 'SOLD']) });
+```
+
+Matchers: `eq ne lt lte gt gte between oneOf like contains startsWith endsWith matches isNull notNull not`.
+A null/undefined cell only matches `isNull()`; comparison/string matchers return `false` for it.
+
 ## Test workflow
 
 ```sh
