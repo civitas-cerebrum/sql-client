@@ -8,6 +8,8 @@ function read(row: Record<string, unknown>, column: string): unknown | typeof AB
     if (column in row) return row[column];
     const upper = column.toUpperCase();
     if (upper in row) return row[upper];
+    const lower = column.toLowerCase();
+    if (lower in row) return row[lower];
     return ABSENT;
 }
 

@@ -34,3 +34,31 @@ assert.equal(getBoolean(row, 'nope'), undefined);
 assert.throws(() => getBoolean({ x: 'maybe' }, 'x'), RangeError);
 
 console.log('result.test.ts core PASSED');
+
+import { getColumn, findRow, filterRows, getScalar } from '../src/result/accessors';
+
+const books = [
+    { book_id: 'book-001', genre: 'Fiction', price: '12.99' },
+    { book_id: 'book-006', genre: 'Non-Fiction', price: '18.99' },
+    { book_id: 'book-008', genre: 'Fantasy', price: '14.99' },
+];
+
+// getColumn
+assert.deepEqual(getColumn(books, 'book_id'), ['book-001', 'book-006', 'book-008']);
+
+// findRow (loose String() compare, case-insensitive key)
+assert.equal(findRow(books, { genre: 'Fantasy' })?.book_id, 'book-008');
+assert.equal(findRow(books, { GENRE: 'Non-Fiction' })?.book_id, 'book-006'); // UPPERCASE key in partial
+assert.equal(findRow(books, { genre: 'Horror' }), undefined);
+
+// filterRows
+assert.equal(filterRows(books, { genre: 'Fiction' }).length, 1);
+assert.equal(filterRows(books, { genre: 'Nope' }).length, 0);
+
+// getScalar — named column from first row, then field-based default
+const result = { rows: [{ n: '8' }], rowCount: 1, fields: [{ name: 'n', dataTypeID: 0 }] };
+assert.equal(getScalar(result, 'n'), '8');
+assert.equal(getScalar(result), '8');                  // defaults to first field
+assert.equal(getScalar({ rows: [], rowCount: 0, fields: [] }), undefined); // empty
+
+console.log('result.test.ts collections PASSED');
