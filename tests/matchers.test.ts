@@ -53,4 +53,26 @@ assert.equal(notNull()(null), false);
 assert.equal(not(eq('Fiction'))('Fantasy'), true);
 assert.equal(not(lt(10))(12), true);
 
+import { findRow, filterRows } from '../src/result/accessors';
+
+const books = [
+    { book_id: 'book-004', genre: 'Fiction', price: '9.99' },
+    { book_id: 'book-005', genre: 'Fiction', price: '8.99' },
+    { book_id: 'book-006', genre: 'Non-Fiction', price: '18.99' },
+];
+
+// partial with matchers
+assert.equal(filterRows(books, { genre: 'Fiction', price: lt(10) }).length, 2);
+assert.equal(filterRows(books, { price: gte(15) }).length, 1);
+assert.equal(findRow(books, { price: between(8, 9) })?.book_id, 'book-005');
+assert.equal(findRow(books, { genre: eq('Non-Fiction') })?.book_id, 'book-006');
+
+// literal still means equality (backward compat)
+assert.equal(filterRows(books, { genre: 'Fiction' }).length, 2);
+
+// raw-row predicate overload
+assert.equal(filterRows(books, (r) => Number(r.price) < 10).length, 2);
+assert.equal(findRow(books, (r) => r.genre === 'Non-Fiction')?.book_id, 'book-006');
+
+console.log('matchers.test.ts accessors PASSED');
 console.log('matchers.test.ts PASSED');

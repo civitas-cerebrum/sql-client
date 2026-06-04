@@ -55,19 +55,30 @@ export function getColumn(rows: Record<string, unknown>[], column: string): unkn
     return rows.map((r) => getValue(r, column));
 }
 
-/** True if every key/value in `partial` matches the row (case-insensitive key, String() loose compare). */
-function matches(row: Record<string, unknown>, partial: Record<string, unknown>): boolean {
-    return Object.entries(partial).every(([k, v]) => String(getValue(row, k)) === String(v));
+/** A predicate over a raw row record. */
+export type RowPredicate = (row: Record<string, unknown>) => boolean;
+
+/** True if every key/value in `partial` matches. A function value is a Matcher applied to the column. */
+function matchesPartial(row: Record<string, unknown>, partial: Record<string, unknown>): boolean {
+    return Object.entries(partial).every(([k, v]) => {
+        const actual = getValue(row, k);
+        return typeof v === 'function' ? (v as (value: unknown) => boolean)(actual) : String(actual) === String(v);
+    });
 }
 
-/** First row matching `partial`. */
-export function findRow<T extends Record<string, unknown>>(rows: T[], partial: Record<string, unknown>): T | undefined {
-    return rows.find((r) => matches(r, partial));
+/** Normalise a where-arg into a row predicate. */
+function toPredicate(where: Record<string, unknown> | RowPredicate): RowPredicate {
+    return typeof where === 'function' ? where : (row) => matchesPartial(row, where);
 }
 
-/** All rows matching `partial`. */
-export function filterRows<T extends Record<string, unknown>>(rows: T[], partial: Record<string, unknown>): T[] {
-    return rows.filter((r) => matches(r, partial));
+/** First row matching `where` (matcher-aware partial or a raw-row predicate). */
+export function findRow<T extends Record<string, unknown>>(rows: T[], where: Record<string, unknown> | RowPredicate): T | undefined {
+    return rows.find(toPredicate(where));
+}
+
+/** All rows matching `where` (matcher-aware partial or a raw-row predicate). */
+export function filterRows<T extends Record<string, unknown>>(rows: T[], where: Record<string, unknown> | RowPredicate): T[] {
+    return rows.filter(toPredicate(where));
 }
 
 /** Value of the first row's `column` (named, or the first field when omitted). undefined if no rows. */
