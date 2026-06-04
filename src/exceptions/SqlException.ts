@@ -28,3 +28,11 @@ export class UnsupportedEngineException extends SqlException {
         this.name = 'UnsupportedEngineException';
     }
 }
+
+/** Thrown when a result-set cardinality expectation is violated (e.g. one() on 0 or >1 rows). */
+export class ResultError extends SqlException {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ResultError';
+    }
+}
