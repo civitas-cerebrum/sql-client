@@ -11,7 +11,7 @@ with a fluent query builder, typed results, and always-parametrised queries. Sib
 |---------------------|----------------------------------------------------|---------------------|
 | **PostgreSQL**      | `postgres://` · `postgresql://`                    | `pg`                |
 | **MySQL / MariaDB** | `mysql://` · `mariadb://`                          | `mysql2`            |
-| **SQLite**          | `sqlite:` · `sqlite::memory:` · `file:` · `:memory:` · `*.db` | `better-sqlite3` |
+| **SQLite**          | `sqlite:` · `sqlite::memory:` · `file:` · `:memory:` · `*.db` · `*.sqlite` | `better-sqlite3` |
 | **SQL Server**      | `mssql://` · `sqlserver://`                        | `mssql`             |
 | **Oracle**          | `oracle://` · `oracledb://`                        | `oracledb`          |
 
