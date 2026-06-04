@@ -100,6 +100,7 @@ assert.equal(r.number('price'), 11.99);
 assert.equal(r.boolean('active'), true);
 assert.equal(r.get('title'), '1984');
 assert.equal(r.has('title'), true);
+assert.equal(r.has('TITLE'), true);              // case-insensitive (matches get())
 assert.equal(r.has('nope'), false);
 assert.deepEqual(r.raw(), { title: '1984', price: '11.99', active: 1 });
 

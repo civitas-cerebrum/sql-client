@@ -10,7 +10,7 @@ export class Row {
     number(column: string): number | null | undefined { return getNumber(this.data, column); }
     boolean(column: string): boolean | null | undefined { return getBoolean(this.data, column); }
     has(column: string): boolean {
-        return column in this.data || column.toUpperCase() in this.data;
+        return column in this.data || column.toUpperCase() in this.data || column.toLowerCase() in this.data;
     }
     raw(): Record<string, unknown> { return this.data; }
 }
