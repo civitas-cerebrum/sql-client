@@ -1,0 +1,105 @@
+
+=== API COVERAGE REPORT ===
+
+MssqlDialect: 3/3
+  [x] placeholder
+  [x] quoteIdentifier
+  [x] compilePagination
+
+MssqlDriver: 4/4
+  [x] query
+  [x] execute
+  [x] transaction
+  [x] end
+
+MssqlFactory: 2/2
+  [x] createDriver
+  [x] createDialect
+
+MySqlDialect: 3/3
+  [x] placeholder
+  [x] quoteIdentifier
+  [x] compilePagination
+
+MySqlDriver: 4/4
+  [x] query
+  [x] execute
+  [x] transaction
+  [x] end
+
+MySqlFactory: 2/2
+  [x] createDriver
+  [x] createDialect
+
+OracleDialect: 3/3
+  [x] placeholder
+  [x] quoteIdentifier
+  [x] compilePagination
+
+OracleDriver: 4/4
+  [x] query
+  [x] execute
+  [x] transaction
+  [x] end
+
+OracleFactory: 2/2
+  [x] createDriver
+  [x] createDialect
+
+PostgresDialect: 3/3
+  [x] placeholder
+  [x] quoteIdentifier
+  [x] compilePagination
+
+PostgresDriver: 4/4
+  [x] query
+  [x] execute
+  [x] transaction
+  [x] end
+
+PostgresFactory: 2/2
+  [x] createDriver
+  [x] createDialect
+
+QueryBuilder: 16/16
+  [x] select
+  [x] insert
+  [x] update
+  [x] delete
+  [x] columns
+  [x] join
+  [x] where
+  [x] groupBy
+  [x] having
+  [x] orderBy
+  [x] limit
+  [x] offset
+  [x] values
+  [x] set
+  [x] toSql
+  [x] run
+
+SqlClient: 4/4
+  [x] query
+  [x] execute
+  [x] transaction
+  [x] end
+
+SqliteDialect: 3/3
+  [x] placeholder
+  [x] quoteIdentifier
+  [x] compilePagination
+
+SqliteDriver: 4/4
+  [x] query
+  [x] execute
+  [x] transaction
+  [x] end
+
+SqliteFactory: 2/2
+  [x] createDriver
+  [x] createDialect
+
+OVERALL: 65/65 (100.0%)
+THRESHOLD: 100%
+STATUS: PASSED
