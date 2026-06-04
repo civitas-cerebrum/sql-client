@@ -7,7 +7,6 @@
  */
 
 import { SqlClient } from '../../src/client/SqlClient';
-import { getValue } from '../../src/result/accessors';
 
 // ---------------------------------------------------------------------------
 // Parametrisation helpers
@@ -19,18 +18,6 @@ import { getValue } from '../../src/result/accessors';
  */
 export function ph(client: SqlClient, i: number): string {
     return client.dialect.placeholder(i);
-}
-
-// ---------------------------------------------------------------------------
-// Column accessor / coercion
-// ---------------------------------------------------------------------------
-
-/** Case-insensitive column accessor — re-exported from the package's getValue. */
-export const col = getValue;
-
-/** Coerce pg/mysql NUMERIC/DECIMAL strings to number. */
-export function num(v: unknown): number {
-    return Number(v);
 }
 
 // ---------------------------------------------------------------------------

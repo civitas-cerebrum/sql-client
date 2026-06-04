@@ -10,10 +10,8 @@
  * ------------
  * - All parametrised SQL uses `client.dialect.placeholder(n)` so the correct
  *   marker ($1 / ? / @p1 / :1) is emitted per engine.
- * - Column access goes through `col(row, name)` which is case-insensitive;
- *   Oracle returns UPPERCASE keys.
- * - Numeric aggregates go through `num(v)` because pg/mysql return NUMERIC as
- *   strings.
+ * - Column access goes through `rows(result)` + Row accessor methods which are
+ *   case-insensitive and type-coercing; Oracle UPPERCASE keys are handled.
  * - QueryBuilder is used for pagination (compilePagination differs per dialect:
  *   LIMIT/OFFSET vs OFFSET..FETCH).
  * - Raw SQL uses unquoted lowercase identifiers (Oracle folds unquoted to
@@ -31,11 +29,8 @@ import assert from 'node:assert/strict';
 import { SqlClient } from '../../src/client/SqlClient';
 import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { QueryFailedException } from '../../src/exceptions/SqlException';
-import { ph, col, num, statusCol, bindDate } from './_helpers';
-
-// Re-export col/num so any existing consumer that imports from use-cases.ts
-// continues to compile without changes.
-export { col, num } from './_helpers';
+import { ph, statusCol, bindDate } from './_helpers';
+import { rows } from '../../src/result/ResultSet';
 
 // ---------------------------------------------------------------------------
 // Main harness
@@ -52,10 +47,11 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         const sql = `SELECT title FROM books WHERE book_id = ${ph(client, 1)}`;
         const result = await client.query<Record<string, unknown>>(sql, ['book-003']);
         assert.equal(result.rowCount, 1, `UC1: expected rowCount=1, got ${result.rowCount}`);
+        const r1 = rows(result).one();
         assert.equal(
-            String(col(result.rows[0], 'title')),
+            r1.string('title'),
             '1984',
-            `UC1: expected title='1984', got '${col(result.rows[0], 'title')}'`,
+            `UC1: expected title='1984', got '${r1.string('title')}'`,
         );
     }
 
@@ -67,7 +63,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         const sql = `SELECT title FROM books WHERE genre = ${ph(client, 1)} ORDER BY title`;
         const result = await client.query<Record<string, unknown>>(sql, ['Fiction']);
         assert.equal(result.rowCount, 5, `UC2: expected 5 Fiction books, got ${result.rowCount}`);
-        const titles = result.rows.map((r) => String(col(r, 'title')));
+        const titles = rows(result).column('title').map(String);
         assert.ok(titles.includes('1984'), `UC2: '1984' not found in Fiction titles: ${titles.join(', ')}`);
     }
 
@@ -92,10 +88,11 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         }
         const result = await qb3.run(client);
         assert.equal(result.rowCount, 2, `UC3: expected 2 rows, got ${result.rowCount}`);
+        const r3 = rows(result).first();
         assert.equal(
-            String(col(result.rows[0] as Record<string, unknown>, 'title')),
+            r3!.string('title'),
             '1984',
-            `UC3: expected first title='1984', got '${col(result.rows[0] as Record<string, unknown>, 'title')}'`,
+            `UC3: expected first title='1984', got '${r3!.string('title')}'`,
         );
     }
 
@@ -113,7 +110,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             .orderBy('order_items.book_id')
             .run(client);
         assert.equal(result.rowCount, 2, `UC4: expected 2 order items for order-001, got ${result.rowCount}`);
-        const bookIds = result.rows.map((r) => String(col(r as Record<string, unknown>, 'book_id')));
+        const bookIds = rows(result).column('book_id').map(String);
         assert.ok(bookIds.includes('book-001'), `UC4: book-001 missing from order-001 items`);
         assert.ok(bookIds.includes('book-003'), `UC4: book-003 missing from order-001 items`);
     }
@@ -134,11 +131,11 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             'ORDER BY SUM(oi.quantity) DESC, b.genre ASC',
         ].join(' ');
         const result = await client.query<Record<string, unknown>>(sql);
-        assert.equal(result.rows.length, 3, `UC5: expected 3 genre rows, got ${result.rows.length}`);
+        assert.equal(rows(result).length, 3, `UC5: expected 3 genre rows, got ${rows(result).length}`);
 
         const byGenre: Record<string, number> = {};
-        for (const row of result.rows) {
-            byGenre[String(col(row, 'genre'))] = num(col(row, 'units'));
+        for (const r of rows(result).all()) {
+            byGenre[r.string('genre')!] = r.number('units')!;
         }
         assert.equal(byGenre['Fiction'], 3, `UC5: Fiction units expected 3, got ${byGenre['Fiction']}`);
         assert.equal(byGenre['Fantasy'], 2, `UC5: Fantasy units expected 2, got ${byGenre['Fantasy']}`);
@@ -159,20 +156,22 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             .orderBy('book_id')
             .run(client);
         assert.equal(agg.rowCount, 2, `UC5b: expected 2 rows with SUM(quantity)>=2, got ${agg.rowCount}`);
+        const agg0 = rows(agg).at(0)!;
+        const agg1 = rows(agg).at(1)!;
         assert.equal(
-            String(col(agg.rows[0] as Record<string, unknown>, 'book_id')),
+            agg0.string('book_id'),
             'book-003',
-            `UC5b: expected first book_id='book-003', got '${col(agg.rows[0] as Record<string, unknown>, 'book_id')}'`,
+            `UC5b: expected first book_id='book-003', got '${agg0.string('book_id')}'`,
         );
         assert.equal(
-            num(col(agg.rows[0] as Record<string, unknown>, 'units')),
+            agg0.number('units'),
             2,
-            `UC5b: expected first units=2, got ${num(col(agg.rows[0] as Record<string, unknown>, 'units'))}`,
+            `UC5b: expected first units=2, got ${agg0.number('units')}`,
         );
         assert.equal(
-            String(col(agg.rows[1] as Record<string, unknown>, 'book_id')),
+            agg1.string('book_id'),
             'book-008',
-            `UC5b: expected second book_id='book-008', got '${col(agg.rows[1] as Record<string, unknown>, 'book_id')}'`,
+            `UC5b: expected second book_id='book-008', got '${agg1.string('book_id')}'`,
         );
     }
 
@@ -187,7 +186,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             'ORDER BY username',
         ].join(' ');
         const result = await client.query<Record<string, unknown>>(sql);
-        const usernames = result.rows.map((r) => String(col(r, 'username')));
+        const usernames = rows(result).column('username').map(String);
         assert.deepEqual(usernames, ['alice', 'bob'], `UC6: expected [alice, bob], got ${JSON.stringify(usernames)}`);
     }
 
@@ -218,8 +217,9 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             `WHERE r.rnk = ${rankParam}`,
         ].join(' ');
         const result = await client.query<Record<string, unknown>>(sql, [1]);
-        assert.ok(result.rows.length >= 1, `UC7: expected at least 1 rank-1 row, got ${result.rows.length}`);
-        const titles = result.rows.map((r) => String(col(r, 'title')));
+        const rs7 = rows(result);
+        assert.ok(rs7.length >= 1, `UC7: expected at least 1 rank-1 row, got ${rs7.length}`);
+        const titles = rs7.column('title').map(String);
         assert.ok(
             titles.includes('1984'),
             `UC7: expected '1984' in rank-1 results, got ${JSON.stringify(titles)}`,
@@ -235,7 +235,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         // Part A — raw distinct
         const sqlA = 'SELECT DISTINCT genre FROM books ORDER BY genre ASC';
         const resultA = await client.query<Record<string, unknown>>(sqlA);
-        const allGenres = resultA.rows.map((r) => String(col(r, 'genre')));
+        const allGenres = rows(resultA).column('genre').map(String);
         assert.deepEqual(
             allGenres,
             ['Fantasy', 'Fiction', 'Non-Fiction'],
@@ -253,7 +253,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             .offset(1)
             .limit(2)
             .run(client);
-        const pagedGenres = resultB.rows.map((r) => String(col(r as Record<string, unknown>, 'genre')));
+        const pagedGenres = rows(resultB).column('genre').map(String);
         assert.deepEqual(
             pagedGenres,
             ['Fiction', 'Non-Fiction'],
@@ -289,7 +289,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
                 .run(client);
             assert.equal(selResult.rowCount, 1, `UC9 SELECT-back: expected 1 row, got ${selResult.rowCount}`);
             assert.equal(
-                num(col(selResult.rows[0] as Record<string, unknown>, 'quantity')),
+                rows(selResult).one().number('quantity'),
                 3,
                 `UC9 SELECT-back: expected quantity=3`,
             );
@@ -308,7 +308,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
                 .where('cart_item_id = ?', tempId)
                 .run(client);
             assert.equal(
-                num(col(selAfterUpd.rows[0] as Record<string, unknown>, 'quantity')),
+                rows(selAfterUpd).one().number('quantity'),
                 7,
                 `UC9 UPDATE verify: expected quantity=7`,
             );
@@ -393,10 +393,11 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         try {
             // Verify committed stock
             const stockResult = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
+            const stockRow = rows(stockResult).one();
             assert.equal(
-                num(col(stockResult.rows[0], 'stock')),
+                stockRow.number('stock'),
                 11,
-                `UC11 COMMIT: expected stock=11, got ${num(col(stockResult.rows[0], 'stock'))}`,
+                `UC11 COMMIT: expected stock=11, got ${stockRow.number('stock')}`,
             );
         } finally {
             // Clean up: delete temp order and restore stock
@@ -408,10 +409,11 @@ export async function runUseCases(client: SqlClient): Promise<void> {
 
         // Confirm cleanup
         const finalStock = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
+        const finalRow = rows(finalStock).one();
         assert.equal(
-            num(col(finalStock.rows[0], 'stock')),
+            finalRow.number('stock'),
             12,
-            `UC11 cleanup: expected stock=12, got ${num(col(finalStock.rows[0], 'stock'))}`,
+            `UC11 cleanup: expected stock=12, got ${finalRow.number('stock')}`,
         );
     }
 
@@ -423,7 +425,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         const stockSQL = `SELECT stock FROM books WHERE book_id = ${ph(client, 1)}`;
 
         const before = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
-        const stockBefore = num(col(before.rows[0], 'stock'));
+        const stockBefore = rows(before).one().number('stock');
 
         await assert.rejects(
             client.transaction(async (tx) => {
@@ -437,7 +439,7 @@ export async function runUseCases(client: SqlClient): Promise<void> {
         );
 
         const after = await client.query<Record<string, unknown>>(stockSQL, ['book-002']);
-        const stockAfter = num(col(after.rows[0], 'stock'));
+        const stockAfter = rows(after).one().number('stock');
         assert.equal(
             stockAfter,
             stockBefore,

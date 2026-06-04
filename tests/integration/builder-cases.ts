@@ -9,8 +9,8 @@
  * Design notes
  * ------------
  * - `.run(client)` dispatches through the client; SELECT → query, else execute.
- * - `col(row, name)` for column access (Oracle → UPPERCASE keys).
- * - `num(v)` for DECIMAL/NUMERIC results.
+ * - `rows(result)` + Row accessor methods for column access (case-insensitive;
+ *   Oracle UPPERCASE keys are handled). Numeric coercion via `.number(col)`.
  * - Pagination SQL is checked via `.toSql(client.dialect).text`:
  *     LIMIT/OFFSET on postgres/mysql/sqlite
  *     OFFSET..FETCH / OFFSET..ROWS on mssql/oracle
@@ -24,7 +24,7 @@
 import assert from 'node:assert/strict';
 import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { SqlClient } from '../../src/client/SqlClient';
-import { col, num } from './_helpers';
+import { rows } from '../../src/result/ResultSet';
 
 export async function runBuilderCases(client: SqlClient): Promise<void> {
     const e = client.engine;
@@ -47,14 +47,14 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .where('book_id = ?', 'book-001')
             .run(client);
         assert.equal(result.rowCount, 1, `BC-2: rowCount should be 1`);
-        const row = result.rows[0] as Record<string, unknown>;
+        const bc2 = rows(result).one();
         // The selected column values should be present
-        assert.ok(col(row, 'book_id') !== undefined, `BC-2: book_id should be present`);
-        assert.ok(col(row, 'title') !== undefined, `BC-2: title should be present`);
-        assert.ok(col(row, 'price') !== undefined, `BC-2: price should be present`);
+        assert.ok(bc2.get('book_id') !== undefined, `BC-2: book_id should be present`);
+        assert.ok(bc2.get('title') !== undefined, `BC-2: title should be present`);
+        assert.ok(bc2.get('price') !== undefined, `BC-2: price should be present`);
         // A non-selected column should be absent
-        assert.strictEqual(col(row, 'stock'), undefined, `BC-2: stock should not be in the result row`);
-        assert.strictEqual(col(row, 'author'), undefined, `BC-2: author should not be in the result row`);
+        assert.strictEqual(bc2.get('stock'), undefined, `BC-2: stock should not be in the result row`);
+        assert.strictEqual(bc2.get('author'), undefined, `BC-2: author should not be in the result row`);
     }
 
     // ==========================================================================
@@ -68,7 +68,7 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .run(client);
         assert.equal(result.rowCount, 1, `BC-3: rowCount should be 1`);
         assert.equal(
-            String(col(result.rows[0] as Record<string, unknown>, 'title')),
+            rows(result).one().string('title'),
             '1984',
             `BC-3: title should be '1984'`,
         );
@@ -87,9 +87,9 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .orderBy('book_id')
             .run(client);
         assert.equal(result.rowCount, 2, `BC-4: expected 2 rows, got ${result.rowCount}`);
-        const ids = result.rows.map((r) => String(col(r as Record<string, unknown>, 'book_id')));
-        assert.ok(ids.includes('book-004'), `BC-4: book-004 should be in results`);
-        assert.ok(ids.includes('book-005'), `BC-4: book-005 should be in results`);
+        const ids4 = rows(result).column('book_id').map(String);
+        assert.ok(ids4.includes('book-004'), `BC-4: book-004 should be in results`);
+        assert.ok(ids4.includes('book-005'), `BC-4: book-005 should be in results`);
     }
 
     // ==========================================================================
@@ -116,9 +116,9 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .orderBy('order_items.book_id')
             .run(client);
         assert.equal(result.rowCount, 2, `BC-6: expected 2 join rows for order-001, got ${result.rowCount}`);
-        const bookIds = result.rows.map((r) => String(col(r as Record<string, unknown>, 'book_id')));
-        assert.ok(bookIds.includes('book-001'), `BC-6: book-001 missing`);
-        assert.ok(bookIds.includes('book-003'), `BC-6: book-003 missing`);
+        const bookIds6 = rows(result).column('book_id').map(String);
+        assert.ok(bookIds6.includes('book-001'), `BC-6: book-001 missing`);
+        assert.ok(bookIds6.includes('book-003'), `BC-6: book-003 missing`);
     }
 
     // ==========================================================================
@@ -133,10 +133,11 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .orderBy('book_id')
             .run(client);
         assert.equal(result.rowCount, 2, `BC-7: expected 2 rows, got ${result.rowCount}`);
-        const bookIds = result.rows.map((r) => String(col(r as Record<string, unknown>, 'book_id')));
-        assert.deepEqual(bookIds, ['book-003', 'book-008'], `BC-7: book_ids mismatch: ${JSON.stringify(bookIds)}`);
-        assert.equal(num(col(result.rows[0] as Record<string, unknown>, 'total_qty')), 2, `BC-7: book-003 qty should be 2`);
-        assert.equal(num(col(result.rows[1] as Record<string, unknown>, 'total_qty')), 2, `BC-7: book-008 qty should be 2`);
+        const rs7 = rows(result);
+        const bookIds7 = rs7.column('book_id').map(String);
+        assert.deepEqual(bookIds7, ['book-003', 'book-008'], `BC-7: book_ids mismatch: ${JSON.stringify(bookIds7)}`);
+        assert.equal(rs7.at(0)!.number('total_qty'), 2, `BC-7: book-003 qty should be 2`);
+        assert.equal(rs7.at(1)!.number('total_qty'), 2, `BC-7: book-008 qty should be 2`);
     }
 
     // ==========================================================================
@@ -151,7 +152,7 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .run(client);
         assert.equal(result.rowCount, 5, `BC-8: expected 5 Fiction rows`);
         assert.equal(
-            String(col(result.rows[0] as Record<string, unknown>, 'title')),
+            rows(result).first()!.string('title'),
             '1984',
             `BC-8: first Fiction book alphabetically should be '1984'`,
         );
@@ -172,7 +173,7 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .run(client);
         assert.equal(result.rowCount, 5, `BC-9: expected 5 Fiction rows`);
         assert.equal(
-            String(col(result.rows[0] as Record<string, unknown>, 'title')),
+            rows(result).first()!.string('title'),
             'To Kill a Mockingbird',
             `BC-9: first row DESC should be 'To Kill a Mockingbird'`,
         );
@@ -195,12 +196,12 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
             .run(client);
         // Fantasy (1 book) + Non-Fiction (2 books) = 3 rows
         assert.equal(result.rowCount, 3, `BC-10: expected 3 non-Fiction rows, got ${result.rowCount}`);
-        const rows = result.rows as Record<string, unknown>[];
+        const rs10 = rows(result);
         // genre ASC: Fantasy < Non-Fiction; first row genre=Fantasy
-        assert.equal(String(col(rows[0], 'genre')), 'Fantasy', `BC-10: row[0] genre should be Fantasy`);
+        assert.equal(rs10.at(0)!.string('genre'), 'Fantasy', `BC-10: row[0] genre should be Fantasy`);
         // Non-Fiction rows: price DESC → 18.99 before 16.99
-        assert.equal(num(col(rows[1], 'price')), 18.99, `BC-10: row[1] price should be 18.99 (Sapiens)`);
-        assert.equal(num(col(rows[2], 'price')), 16.99, `BC-10: row[2] price should be 16.99 (Educated)`);
+        assert.equal(rs10.at(1)!.number('price'), 18.99, `BC-10: row[1] price should be 18.99 (Sapiens)`);
+        assert.equal(rs10.at(2)!.number('price'), 16.99, `BC-10: row[2] price should be 16.99 (Educated)`);
     }
 
     // ==========================================================================
@@ -274,8 +275,8 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
 
         const result = await qb.run(client);
         assert.equal(result.rowCount, 3, `BC-13: expected 3 rows, got ${result.rowCount}`);
-        const ids = result.rows.map((r) => String(col(r as Record<string, unknown>, 'book_id')));
-        assert.deepEqual(ids, ['book-003', 'book-004', 'book-005'], `BC-13: ids mismatch: ${JSON.stringify(ids)}`);
+        const ids13 = rows(result).column('book_id').map(String);
+        assert.deepEqual(ids13, ['book-003', 'book-004', 'book-005'], `BC-13: ids mismatch: ${JSON.stringify(ids13)}`);
     }
 
     // ==========================================================================
@@ -309,10 +310,10 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
                 .where('book_id = ?', tempId)
                 .run(client);
             assert.equal(selResult.rowCount, 1, `BC-14 SELECT-back: expected 1 row`);
-            const row = selResult.rows[0] as Record<string, unknown>;
-            assert.equal(String(col(row, 'title')), 'Builder Test Book', `BC-14 SELECT-back: title mismatch`);
-            assert.equal(num(col(row, 'price')), 3.99, `BC-14 SELECT-back: price should be 3.99`);
-            assert.equal(num(col(row, 'stock')), 5, `BC-14 SELECT-back: stock should be 5`);
+            const bc14sel = rows(selResult).one();
+            assert.equal(bc14sel.string('title'), 'Builder Test Book', `BC-14 SELECT-back: title mismatch`);
+            assert.equal(bc14sel.number('price'), 3.99, `BC-14 SELECT-back: price should be 3.99`);
+            assert.equal(bc14sel.number('stock'), 5, `BC-14 SELECT-back: stock should be 5`);
 
             // UPDATE
             const updResult = await QueryBuilder
@@ -328,9 +329,9 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
                 .columns('price', 'stock')
                 .where('book_id = ?', tempId)
                 .run(client);
-            const updRow = selAfterUpd.rows[0] as Record<string, unknown>;
-            assert.equal(num(col(updRow, 'price')), 4.99, `BC-14 UPDATE verify: price should be 4.99`);
-            assert.equal(num(col(updRow, 'stock')), 10, `BC-14 UPDATE verify: stock should be 10`);
+            const bc14upd = rows(selAfterUpd).one();
+            assert.equal(bc14upd.number('price'), 4.99, `BC-14 UPDATE verify: price should be 4.99`);
+            assert.equal(bc14upd.number('stock'), 10, `BC-14 UPDATE verify: stock should be 10`);
 
             // DELETE
             const delResult = await QueryBuilder
