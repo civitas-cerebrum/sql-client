@@ -20,3 +20,11 @@ export class QueryFailedException extends SqlException {
         this.name = 'QueryFailedException';
     }
 }
+
+/** Thrown when an engine is unknown or its native driver isn't installed. */
+export class UnsupportedEngineException extends SqlException {
+    constructor(message: string) {
+        super(message);
+        this.name = 'UnsupportedEngineException';
+    }
+}
