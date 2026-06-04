@@ -22,6 +22,7 @@ import assert from 'node:assert/strict';
 import { SqlClient } from '../../src/client/SqlClient';
 import { ph, col, num, conditionCol, bindDate } from './_helpers';
 import { rows } from '../../src/result/ResultSet';
+import { lt } from '../../src/result/matchers';
 
 export async function runLookups(client: SqlClient): Promise<void> {
 
@@ -107,6 +108,15 @@ export async function runLookups(client: SqlClient): Promise<void> {
         const sql = 'SELECT COUNT(*) AS cnt FROM books';
         const countResult = await client.query<Record<string, unknown>>(sql);
         assert.equal(Number(rows(countResult).scalar()), 8, `L-B9: expected 8 books`);
+    }
+
+    // L-B10: matcher filtering on a fetched result (dogfood)
+    {
+        const allBooks = await client.query(`SELECT book_id, genre, price FROM books`);
+        const cheapFiction = rows(allBooks).where({ genre: 'Fiction', price: lt(10) });
+        assert.equal(cheapFiction.length, 2, 'matcher: Fiction under 10 → book-004, book-005');
+        const orwell = rows(allBooks).find((row) => String(row.get('book_id')) === 'book-003');
+        assert.ok(orwell, 'predicate: book-003 found');
     }
 
     // ==========================================================================
