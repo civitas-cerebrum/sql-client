@@ -98,8 +98,7 @@ export class QueryBuilder {
         if (this._orderBy.length) {
             sql += ' ORDER BY ' + this._orderBy.map((o) => `${this.quoteColumn(d, o.col)} ${o.dir}`).join(', ');
         }
-        if (this._limit !== undefined) sql += ` LIMIT ${this._limit}`;
-        if (this._offset !== undefined) sql += ` OFFSET ${this._offset}`;
+        sql += d.compilePagination(this._limit, this._offset);
         return sql;
     }
 
