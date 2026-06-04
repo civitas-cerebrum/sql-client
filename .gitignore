@@ -5,3 +5,7 @@ dist
 test-coverage-report.md
 test-coverage-report.txt
 coverage-context/
+
+# Superpowers brainstorming specs & implementation plans — never commit
+docs/superpowers/
+.superpowers/
