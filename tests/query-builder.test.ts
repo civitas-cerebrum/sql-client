@@ -52,3 +52,33 @@ import { QueryBuilder } from '../src/builder/QueryBuilder';
 }
 
 console.log('query-builder.test.ts SELECT PASSED');
+
+// INSERT
+{
+    const { text, values } = QueryBuilder.insert('cart_items')
+        .values({ user_id: 'user-001', book_id: 'book-001', quantity: 2 })
+        .toSql();
+    assert.equal(text, 'INSERT INTO "cart_items" ("user_id", "book_id", "quantity") VALUES ($1, $2, $3)');
+    assert.deepEqual(values, ['user-001', 'book-001', 2]);
+}
+
+// UPDATE with where
+{
+    const { text, values } = QueryBuilder.update('books')
+        .set({ stock: 14, price: 9.49 })
+        .where('book_id = ?', 'book-001')
+        .toSql();
+    assert.equal(text, 'UPDATE "books" SET "stock" = $1, "price" = $2 WHERE book_id = $3');
+    assert.deepEqual(values, [14, 9.49, 'book-001']);
+}
+
+// DELETE with where
+{
+    const { text, values } = QueryBuilder.delete('cart_items')
+        .where('user_id = ?', 'user-001')
+        .toSql();
+    assert.equal(text, 'DELETE FROM "cart_items" WHERE user_id = $1');
+    assert.deepEqual(values, ['user-001']);
+}
+
+console.log('query-builder.test.ts WRITE PASSED');
