@@ -62,3 +62,58 @@ assert.equal(getScalar(result), '8');                  // defaults to first fiel
 assert.equal(getScalar({ rows: [], rowCount: 0, fields: [] }), undefined); // empty
 
 console.log('result.test.ts collections PASSED');
+
+import { rows, ResultSet, Row } from '../src/result/ResultSet';
+import { ResultError } from '../src/exceptions/SqlException';
+
+const oneResult = { rows: [{ title: '1984', price: '11.99', active: 1 }], rowCount: 1, fields: [{ name: 'title', dataTypeID: 0 }] };
+const manyResult = { rows: books, rowCount: 3, fields: [{ name: 'book_id', dataTypeID: 0 }] };
+const emptyResult = { rows: [] as Record<string, unknown>[], rowCount: 0, fields: [] };
+
+// factory accepts SqlResult and a raw array
+assert.ok(rows(oneResult) instanceof ResultSet);
+assert.ok(rows(books) instanceof ResultSet);
+
+// ResultSet basics
+assert.equal(rows(manyResult).length, 3);
+assert.equal(rows(manyResult).rowCount, 3);
+assert.equal(rows(emptyResult).isEmpty(), true);
+assert.equal(rows(manyResult).isEmpty(), false);
+
+// one() / maybeOne()
+const r = rows(oneResult).one();
+assert.ok(r instanceof Row);
+assert.throws(() => rows(emptyResult).one(), ResultError);
+assert.throws(() => rows(manyResult).one(), ResultError);
+assert.equal(rows(emptyResult).maybeOne(), undefined);
+assert.throws(() => rows(manyResult).maybeOne(), ResultError);
+
+// first / at
+assert.equal(rows(manyResult).first()?.get('book_id'), 'book-001');
+assert.equal(rows(emptyResult).first(), undefined);
+assert.equal(rows(manyResult).at(2)?.get('book_id'), 'book-008');
+assert.equal(rows(manyResult).at(9), undefined);
+
+// Row accessors (delegate to functions; case-insensitive + coercion)
+assert.equal(r.string('title'), '1984');
+assert.equal(r.number('price'), 11.99);
+assert.equal(r.boolean('active'), true);
+assert.equal(r.get('title'), '1984');
+assert.equal(r.has('title'), true);
+assert.equal(r.has('nope'), false);
+assert.deepEqual(r.raw(), { title: '1984', price: '11.99', active: 1 });
+
+// scalar / column / find / where / map / all / raw
+assert.equal(rows(oneResult).scalar(), '1984');           // first field
+assert.equal(rows(oneResult).scalar('price'), '11.99');
+assert.equal(rows(emptyResult).scalar(), undefined);
+assert.deepEqual(rows(manyResult).column('book_id'), ['book-001', 'book-006', 'book-008']);
+assert.equal(rows(manyResult).find({ genre: 'Fantasy' })?.get('book_id'), 'book-008');
+assert.equal(rows(manyResult).find({ genre: 'Horror' }), undefined);
+assert.equal(rows(manyResult).where({ genre: 'Fiction' }).length, 1);
+assert.deepEqual(rows(manyResult).map((row) => row.get('book_id')), ['book-001', 'book-006', 'book-008']);
+assert.equal(rows(manyResult).all().length, 3);
+assert.ok(rows(manyResult).all()[0] instanceof Row);
+assert.deepEqual(rows(manyResult).raw(), books);
+
+console.log('result.test.ts wrapper PASSED');
