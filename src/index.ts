@@ -15,6 +15,11 @@ export type { SqlEngine, DriverConfig } from './models/SqlEngine';
 // Exceptions
 export { SqlException, QueryFailedException, UnsupportedEngineException } from './exceptions/SqlException';
 
+// Result accessors
+export { getValue, getString, getNumber, getBoolean, getColumn, findRow, filterRows, getScalar } from './result/accessors';
+export { rows, ResultSet, Row } from './result/ResultSet';
+export { ResultError } from './exceptions/SqlException';
+
 // Logger
 export { log, createLogger } from './logger/Logger';
 
