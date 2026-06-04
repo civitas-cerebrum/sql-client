@@ -79,6 +79,32 @@ await pg.transaction(async (tx) => {
 await pg.end();
 ```
 
+## Reading results
+
+Pull values out of rows by name — case-insensitive (Oracle returns UPPERCASE keys) and type-coercing
+(Postgres/MySQL return NUMERIC/DECIMAL as strings):
+
+```ts
+import { rows, getNumber } from '@civitas-cerebrum/sql-client';
+
+const res = await db.query('SELECT * FROM books WHERE book_id = $1', ['book-001']);
+
+// Fluent wrapper
+const book = rows(res).one();                 // exactly one row, else throws
+book.string('title');                         // 'To Kill a Mockingbird'
+book.number('price');                         // 12.99
+book.boolean('in_stock');                     // normalizes 1/0, 't'/'f', 'true'/'false'
+
+rows(await db.query('SELECT count(*) FROM books')).scalar();   // first cell of first row
+rows(res).column('title');                    // every title
+rows(res).find({ genre: 'Fiction' });         // first matching row, or undefined
+
+// Or standalone functions on a raw row
+getNumber(res.rows[0], 'price');              // 12.99
+```
+
+Semantics: absent column → `undefined`; SQL NULL → `null`; otherwise coerced.
+
 ## Test workflow
 
 ```sh
