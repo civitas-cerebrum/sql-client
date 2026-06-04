@@ -1,0 +1,33 @@
+{
+  "name": "@civitas-cerebrum/sql-client",
+  "version": "0.0.1",
+  "description": "A lightweight Postgres client library with a fluent query builder, typed results, and parametrised queries.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down -v",
+    "test": "npx tsx tests/dialect.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/sql-client.test.ts",
+    "postinstall": "node scripts/postinstall.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": ["dist", "skills", "scripts/postinstall.js"],
+  "dependencies": {
+    "debug": "^4.4.3",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.13",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": ["postgres", "sql", "query-builder", "database", "test-automation"],
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "git+https://github.com/civitas-cerebrum/sql-client.git" },
+  "author": "Umut Ay Bora",
+  "license": "MIT"
+}
