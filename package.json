@@ -13,21 +13,44 @@
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build"
   },
-  "files": ["dist", "skills", "scripts/postinstall.js"],
+  "files": [
+    "dist",
+    "skills",
+    "scripts/postinstall.js"
+  ],
   "dependencies": {
     "debug": "^4.4.3",
     "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/debug": "^4.1.13",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
+    "better-sqlite3": "^12.10.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   },
-  "keywords": ["postgres", "sql", "query-builder", "database", "test-automation"],
-  "publishConfig": { "access": "public" },
-  "repository": { "type": "git", "url": "git+https://github.com/civitas-cerebrum/sql-client.git" },
+  "peerDependencies": {
+    "better-sqlite3": "*"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": { "optional": true }
+  },
+  "keywords": [
+    "postgres",
+    "sql",
+    "query-builder",
+    "database",
+    "test-automation"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/civitas-cerebrum/sql-client.git"
+  },
   "author": "Umut Ay Bora",
   "license": "MIT"
 }
