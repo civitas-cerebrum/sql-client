@@ -407,7 +407,8 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
                     price: 1.99 + i,
                     cover_image: null,
                     stock: i,
-                    isbn: null,
+                    // distinct isbns: mssql UNIQUE treats two NULLs as duplicates
+                    isbn: `bc-multi-isbn-${i + 1}`,
                 })))
                 .run(client);
             assert.equal(ins.rowCount, 2, `BC-16 INSERT: expected rowCount=2, got ${ins.rowCount}`);

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: bookhive
       POSTGRES_PASSWORD: bookhive
     ports:
-      - "5432:5432"
+      - "${SQL_CLIENT_PG_PORT:-5432}:5432"
     volumes:
       - ./tests/sql/postgres.schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./tests/sql/postgres.seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
@@ -25,7 +25,7 @@ services:
       MYSQL_USER: bookhive
       MYSQL_PASSWORD: bookhive
       MYSQL_ROOT_PASSWORD: rootpw
-    ports: ["3306:3306"]
+    ports: ["${SQL_CLIENT_MYSQL_PORT:-3306}:3306"]
     volumes:
       - ./tests/sql/mysql.schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./tests/sql/mysql.seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
@@ -41,7 +41,7 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "Bookhive!Passw0rd"
-    ports: ["1433:1433"]
+    ports: ["${SQL_CLIENT_MSSQL_PORT:-1433}:1433"]
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"Bookhive!Passw0rd\" -Q \"SELECT 1\" || exit 1"]
       interval: 5s
@@ -55,7 +55,7 @@ services:
       ORACLE_PASSWORD: bookhive
       APP_USER: bookhive
       APP_USER_PASSWORD: bookhive
-    ports: ["1521:1521"]
+    ports: ["${SQL_CLIENT_ORACLE_PORT:-1521}:1521"]
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
       interval: 10s
