@@ -8,7 +8,7 @@ const packageDir = path.resolve(__dirname, '..');
 const skillsDir  = path.join(packageDir, 'skills');
 
 // When installed as a dependency, __dirname is:
-//   <project>/node_modules/@civitas-cerebrum/wasapi/scripts
+//   <project>/node_modules/@civitas-cerebrum/sql-client/scripts
 // so four levels up reaches the consumer's project root.
 const projectRoot = path.resolve(__dirname, '..', '..', '..', '..');
 
@@ -70,10 +70,10 @@ try {
   }
 
   if (installedSkills.size > 0) {
-    console.log(`[@civitas-cerebrum/wasapi] ✔ ${installedSkills.size} skill${installedSkills.size > 1 ? 's' : ''} installed to ${destinations.length} locations — restart Claude Code to pick it up.`);
+    console.log(`[@civitas-cerebrum/sql-client] ✔ ${installedSkills.size} skill${installedSkills.size > 1 ? 's' : ''} installed to ${destinations.length} locations — restart Claude Code to pick it up.`);
   } else {
-    console.warn('[@civitas-cerebrum/wasapi] Skill files not found, skipping.');
+    console.warn('[@civitas-cerebrum/sql-client] Skill files not found, skipping.');
   }
 } catch (err) {
-  console.warn(`[@civitas-cerebrum/wasapi] Could not install Claude Code skill: ${err.message}`);
+  console.warn(`[@civitas-cerebrum/sql-client] Could not install Claude Code skill: ${err.message}`);
 }

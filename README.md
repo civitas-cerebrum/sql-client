@@ -71,6 +71,21 @@ const top = await QueryBuilder.select('books')
   .limit(5)
   .run(pg);
 
+// Multi-row INSERT — values() takes an array (or repeated calls)
+await QueryBuilder.insert('books')
+  .values([
+    { book_id: 'b1', title: 'Dune' },
+    { book_id: 'b2', title: '1984' },
+  ])
+  .run(pg);
+
+// Writes can hand rows back: RETURNING (postgres/sqlite) or OUTPUT (mssql).
+// mysql/oracle have no equivalent — returning() throws UnsupportedEngineException there.
+const ins = await QueryBuilder.insert('books')
+  .values({ title: 'Dune' })
+  .returning('book_id', 'title')   // no args → all columns
+  .run(pg);
+
 // Transaction (auto-ROLLBACK on throw)
 await pg.transaction(async (tx) => {
   await tx.execute('UPDATE books SET stock = stock - 1 WHERE book_id = $1', ['book-001']);
@@ -143,4 +158,14 @@ npm run test:all-engines
 docker compose --profile all down -v
 ```
 
+Host ports collide with something already running? Override them:
+`SQL_CLIENT_PG_PORT`, `SQL_CLIENT_MYSQL_PORT`, `SQL_CLIENT_MSSQL_PORT`, `SQL_CLIENT_ORACLE_PORT`
+(and point the test at it, e.g. `SQL_TEST_URL=postgres://bookhive:bookhive@localhost:15432/bookhive npm run test:postgres`).
+
 Debug logging: `DEBUG=sql:* npm test`.
+
+## Claude Code skill
+
+The package ships a [Claude Code](https://claude.com/claude-code) skill (`skills/sql-client/SKILL.md`)
+that teaches the agent the full API surface. It installs automatically into `.claude/skills/`
+(project + user level) on `npm install`.

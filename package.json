@@ -4,6 +4,16 @@
   "description": "A lightweight multi-engine SQL client (Postgres, MySQL, SQLite, SQL Server, Oracle) with a fluent query builder, typed results, and parametrised queries.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
