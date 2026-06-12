@@ -1,5 +1,5 @@
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException } from '../exceptions/SqlException';
+import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -12,7 +12,7 @@ export class MssqlDriver implements SqlDriver {
     private poolPromise: Promise<import('mssql').ConnectionPool> | null = null;
     constructor(config: DriverConfig) {
         try { this.mssql = require('mssql'); }
-        catch { throw new QueryFailedException('Install "mssql" to use the mssql engine.', '', []); }
+        catch { throw new UnsupportedEngineException('Install "mssql" to use the mssql engine.'); }
         this.cfg = config.connectionString ?? (config.connection as unknown as import('mssql').config);
     }
     private getPool(): Promise<import('mssql').ConnectionPool> {

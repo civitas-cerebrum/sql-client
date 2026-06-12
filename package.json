@@ -9,7 +9,7 @@
     "build": "npm run clean && tsc",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "test:unit": "npx tsx tests/dialects.test.ts && npx tsx tests/pagination.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/engine-detection.test.ts && npx tsx tests/factories.test.ts && npx tsx tests/result.test.ts && npx tsx tests/matchers.test.ts",
+    "test:unit": "npx tsx tests/dialects.test.ts && npx tsx tests/pagination.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/engine-detection.test.ts && npx tsx tests/factories.test.ts && npx tsx tests/result.test.ts && npx tsx tests/matchers.test.ts && npx tsx tests/lazy-driver.test.ts",
     "test:sqlite": "npx tsx tests/integration/sqlite.test.ts",
     "test:postgres": "npx tsx tests/integration/postgres.test.ts",
     "test:mysql": "npx tsx tests/integration/mysql.test.ts",

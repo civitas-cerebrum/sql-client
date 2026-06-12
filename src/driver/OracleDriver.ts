@@ -1,5 +1,5 @@
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException } from '../exceptions/SqlException';
+import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -13,7 +13,7 @@ export class OracleDriver implements SqlDriver {
     private poolPromise: Promise<import('oracledb').Pool> | null = null;
     constructor(config: DriverConfig) {
         try { this.oracledb = require('oracledb'); }
-        catch { throw new QueryFailedException('Install "oracledb" to use the oracle engine.', '', []); }
+        catch { throw new UnsupportedEngineException('Install "oracledb" to use the oracle engine.'); }
         if (!config.connection && !config.connectionString) throw new QueryFailedException('Provide connection or connectionString for the oracle engine.', '', []);
         this.connAttrs = (config.connection as import('oracledb').PoolAttributes) ?? this.parseUrl(config.connectionString!);
         this.poolMax = config.max ?? 10;

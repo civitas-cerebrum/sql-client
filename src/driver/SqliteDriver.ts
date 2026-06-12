@@ -1,5 +1,5 @@
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException } from '../exceptions/SqlException';
+import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -20,7 +20,7 @@ export class SqliteDriver implements SqlDriver {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         let Database: typeof import('better-sqlite3');
         try { Database = require('better-sqlite3'); }
-        catch { throw new QueryFailedException('Install "better-sqlite3" to use the sqlite engine.', '', []); }
+        catch { throw new UnsupportedEngineException('Install "better-sqlite3" to use the sqlite engine.'); }
         this.db = new Database(resolvePath(config));
     }
     private run<T>(sql: string, params: unknown[]): SqlResult<T> {

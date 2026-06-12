@@ -1,5 +1,5 @@
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException } from '../exceptions/SqlException';
+import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -11,7 +11,7 @@ export class MySqlDriver implements SqlDriver {
     constructor(config: DriverConfig) {
         let mysql: typeof import('mysql2/promise');
         try { mysql = require('mysql2/promise'); }
-        catch { throw new QueryFailedException('Install "mysql2" to use the mysql engine.', '', []); }
+        catch { throw new UnsupportedEngineException('Install "mysql2" to use the mysql engine.'); }
         if (config.connectionString) {
             this.pool = mysql.createPool(config.connectionString);
         } else {

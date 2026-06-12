@@ -1,6 +1,6 @@
-import { Pool, PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException } from '../exceptions/SqlException';
+import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -14,7 +14,10 @@ function toResult<T>(res: { rows: unknown[]; rowCount: number | null; fields: { 
 export class PostgresDriver implements SqlDriver {
     private pool: Pool;
     constructor(config: DriverConfig) {
-        this.pool = new Pool({ connectionString: config.connectionString, ...(config.connection ?? {}), max: config.max ?? 10 });
+        let pg: typeof import('pg');
+        try { pg = require('pg'); }
+        catch { throw new UnsupportedEngineException('Install "pg" to use the postgres engine.'); }
+        this.pool = new pg.Pool({ connectionString: config.connectionString, ...(config.connection ?? {}), max: config.max ?? 10 });
     }
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<SqlResult<T>> {
         log('query %s %o', sql, params);
