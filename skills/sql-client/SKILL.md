@@ -13,7 +13,11 @@ description: >
   skill before generating client config, builder chains, or result-accessor calls — do not invent
   method signatures from memory; the conventions are specific (placeholder style differs per
   engine in raw SQL, RETURNING is per-engine, Oracle returns UPPERCASE keys, numeric columns may
-  arrive as strings) and easy to get wrong without this reference.
+  arrive as strings) and easy to get wrong without this reference. Precedence: inside a test spec
+  of a project using a @civitas-cerebrum test framework (element-interactions/achilles or
+  singularity-engine), database work goes through the framework's `steps.sql*` surface — route to
+  the `database-testing` skill there; this skill governs direct package usage (fixtures, harness
+  internals, scripts, applications, or projects without those frameworks).
 ---
 
 # @civitas-cerebrum/sql-client — Agent Skill
@@ -21,6 +25,8 @@ description: >
 A lightweight **multi-engine** SQL client (PostgreSQL, MySQL/MariaDB, SQLite, SQL Server, Oracle) with a fluent query builder, typed results, and always-parametrised queries. Sibling to `@civitas-cerebrum/wasapi` (HTTP). One API, five engines: the dialect layer renders engine-correct placeholders, quoting, pagination, and row-returning writes.
 
 This skill is the consumer-facing usage guide. If a signature or option shape isn't specified here, **stop and read the package's `dist/` types** rather than guessing.
+
+> **Routing:** in projects built on a @civitas-cerebrum test framework (element-interactions/achilles, singularity-engine), test specs must use the framework's `steps.sqlQuery/sqlExecute/sqlTransaction/sqlSelect…/verifySql*` wrappers — defer to the **database-testing** skill for those. Use this skill when driving the package directly: framework internals, fixtures, seed/cleanup scripts, standalone tools, or projects that depend on sql-client without those frameworks.
 
 ## When to read which section
 
