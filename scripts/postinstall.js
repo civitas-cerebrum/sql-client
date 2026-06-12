@@ -7,10 +7,16 @@ const os   = require('os');
 const packageDir = path.resolve(__dirname, '..');
 const skillsDir  = path.join(packageDir, 'skills');
 
-// When installed as a dependency, __dirname is:
-//   <project>/node_modules/@civitas-cerebrum/wasapi/scripts
-// so four levels up reaches the consumer's project root.
-const projectRoot = path.resolve(__dirname, '..', '..', '..', '..');
+// The consumer's project root is everything before the FIRST node_modules
+// segment in our own path. This survives hoisting (<project>/node_modules/
+// @civitas-cerebrum/sql-client), nesting under another package's node_modules
+// (e.g. arriving transitively via @civitas-cerebrum/achilles with a version
+// conflict), and pnpm's .pnpm store layout. INIT_CWD (set by npm to where
+// `npm install` was invoked) is the fallback.
+const nmIndex = packageDir.indexOf(`${path.sep}node_modules${path.sep}`);
+const projectRoot = nmIndex !== -1
+  ? packageDir.slice(0, nmIndex)
+  : (process.env.INIT_CWD || path.resolve(__dirname, '..', '..', '..', '..'));
 
 // Skip when running in the package's own repo (local dev `npm install`) —
 // otherwise we'd recursively install our own skills back over themselves.
@@ -70,10 +76,10 @@ try {
   }
 
   if (installedSkills.size > 0) {
-    console.log(`[@civitas-cerebrum/wasapi] ✔ ${installedSkills.size} skill${installedSkills.size > 1 ? 's' : ''} installed to ${destinations.length} locations — restart Claude Code to pick it up.`);
+    console.log(`[@civitas-cerebrum/sql-client] ✔ ${installedSkills.size} skill${installedSkills.size > 1 ? 's' : ''} installed to ${destinations.length} locations — restart Claude Code to pick it up.`);
   } else {
-    console.warn('[@civitas-cerebrum/wasapi] Skill files not found, skipping.');
+    console.warn('[@civitas-cerebrum/sql-client] Skill files not found, skipping.');
   }
 } catch (err) {
-  console.warn(`[@civitas-cerebrum/wasapi] Could not install Claude Code skill: ${err.message}`);
+  console.warn(`[@civitas-cerebrum/sql-client] Could not install Claude Code skill: ${err.message}`);
 }

@@ -1,33 +1,102 @@
 {
   "name": "@civitas-cerebrum/sql-client",
-  "version": "0.0.1",
-  "description": "A lightweight Postgres client library with a fluent query builder, typed results, and parametrised queries.",
+  "version": "0.1.0",
+  "description": "A lightweight multi-engine SQL client (Postgres, MySQL, SQLite, SQL Server, Oracle) with a fluent query builder, typed results, and parametrised queries.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "test": "npx tsx tests/dialect.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/sql-client.test.ts",
+    "test:unit": "npx tsx tests/dialects.test.ts && npx tsx tests/pagination.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/engine-detection.test.ts && npx tsx tests/factories.test.ts && npx tsx tests/result.test.ts && npx tsx tests/matchers.test.ts && npx tsx tests/lazy-driver.test.ts",
+    "test:sqlite": "npx tsx tests/integration/sqlite.test.ts",
+    "test:postgres": "npx tsx tests/integration/postgres.test.ts",
+    "test:mysql": "npx tsx tests/integration/mysql.test.ts",
+    "test:mssql": "npx tsx tests/integration/mssql.test.ts",
+    "test:oracle": "npx tsx tests/integration/oracle.test.ts",
+    "test": "npm run test:unit && npm run test:sqlite",
+    "test:all-engines": "npm run test:unit && npm run test:postgres && npm run test:sqlite && npm run test:mysql && npm run test:mssql && npm run test:oracle",
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build"
   },
-  "files": ["dist", "skills", "scripts/postinstall.js"],
+  "files": [
+    "dist",
+    "skills",
+    "scripts/postinstall.js"
+  ],
   "dependencies": {
-    "debug": "^4.4.3",
-    "pg": "^8.13.0"
+    "debug": "^4.4.3"
   },
   "devDependencies": {
+    "@civitas-cerebrum/test-coverage": "^0.1.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/debug": "^4.1.13",
+    "@types/mssql": "^12.3.0",
     "@types/node": "^20.0.0",
+    "@types/oracledb": "^6.10.4",
     "@types/pg": "^8.11.0",
+    "better-sqlite3": "^12.10.0",
+    "mssql": "^12.5.5",
+    "mysql2": "^3.22.4",
+    "oracledb": "^7.0.0",
+    "pg": "^8.13.0",
     "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   },
-  "keywords": ["postgres", "sql", "query-builder", "database", "test-automation"],
-  "publishConfig": { "access": "public" },
-  "repository": { "type": "git", "url": "git+https://github.com/civitas-cerebrum/sql-client.git" },
+  "peerDependencies": {
+    "better-sqlite3": "*",
+    "mssql": "*",
+    "mysql2": "*",
+    "oracledb": "*",
+    "pg": "*"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mssql": {
+      "optional": true
+    },
+    "oracledb": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "postgres",
+    "mysql",
+    "sqlite",
+    "mssql",
+    "oracle",
+    "sql",
+    "query-builder",
+    "database",
+    "test-automation",
+    "multi-engine"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/civitas-cerebrum/sql-client.git"
+  },
   "author": "Umut Ay Bora",
   "license": "MIT"
 }

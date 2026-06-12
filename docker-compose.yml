@@ -1,17 +1,63 @@
 services:
   sql-client-postgres:
     image: postgres:16
+    profiles: ["postgres", "all"]
     environment:
       POSTGRES_DB: bookhive
       POSTGRES_USER: bookhive
       POSTGRES_PASSWORD: bookhive
     ports:
-      - "5432:5432"
+      - "${SQL_CLIENT_PG_PORT:-5432}:5432"
     volumes:
-      - ./tests/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./tests/sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./tests/sql/postgres.schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./tests/sql/postgres.seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bookhive -d bookhive"]
       interval: 2s
       timeout: 3s
       retries: 15
+
+  sql-client-mysql:
+    image: mysql:8
+    profiles: ["mysql", "all"]
+    environment:
+      MYSQL_DATABASE: bookhive
+      MYSQL_USER: bookhive
+      MYSQL_PASSWORD: bookhive
+      MYSQL_ROOT_PASSWORD: rootpw
+    ports: ["${SQL_CLIENT_MYSQL_PORT:-3306}:3306"]
+    volumes:
+      - ./tests/sql/mysql.schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./tests/sql/mysql.seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ubookhive", "-pbookhive"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  sql-client-mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["mssql", "all"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Bookhive!Passw0rd"
+    ports: ["${SQL_CLIENT_MSSQL_PORT:-1433}:1433"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"Bookhive!Passw0rd\" -Q \"SELECT 1\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  sql-client-oracle:
+    image: gvenzl/oracle-free:slim
+    profiles: ["oracle", "all"]
+    environment:
+      ORACLE_PASSWORD: bookhive
+      APP_USER: bookhive
+      APP_USER_PASSWORD: bookhive
+    ports: ["${SQL_CLIENT_ORACLE_PORT:-1521}:1521"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 30

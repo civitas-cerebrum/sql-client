@@ -1,0 +1,77 @@
+-- Oracle seed data for bookhive. Apostrophes escaped as ''.
+-- Timestamps use TIMESTAMP '...' literal form with timezone offset.
+
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-001','To Kill a Mockingbird','Harper Lee','Fiction','Racial injustice in the American South.',12.99,'/covers/placeholder-fiction.svg',15,'978-0-06-112008-4')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-002','The Great Gatsby','F. Scott Fitzgerald','Fiction','Wealth and the American Dream in the Jazz Age.',10.99,'/covers/placeholder-fiction.svg',12,'978-0-7432-7356-5')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-003','1984','George Orwell','Fiction','Totalitarianism and surveillance.',11.99,'/covers/placeholder-fiction.svg',18,'978-0-452-28423-4')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-004','Pride and Prejudice','Jane Austen','Fiction','Love and class in Regency England.',9.99,'/covers/placeholder-fiction.svg',14,'978-0-14-143951-8')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-005','The Catcher in the Rye','J.D. Salinger','Fiction','Teenage alienation in postwar New York.',8.99,'/covers/placeholder-fiction.svg',10,'978-0-316-76948-0')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-006','Sapiens','Yuval Noah Harari','Non-Fiction','A brief history of humankind.',18.99,'/covers/placeholder-nonfiction.svg',20,'978-0-06-231609-7')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-007','Educated','Tara Westover','Non-Fiction','A memoir about education and family.',16.99,'/covers/placeholder-nonfiction.svg',8,'978-0-399-59050-4')
+/
+INSERT INTO books (book_id, title, author, genre, description, price, cover_image, stock, isbn) VALUES
+('book-008','The Hobbit','J.R.R. Tolkien','Fantasy','Bilbo Baggins'' unexpected journey.',14.99,'/covers/placeholder-fantasy.svg',25,'978-0-547-92822-7')
+/
+
+INSERT INTO users (user_id, username, email, password_hash, created_at) VALUES
+('user-001','alice','alice@bookhive.test','x-hash-1',TIMESTAMP '2026-01-01 10:00:00 +00:00')
+/
+INSERT INTO users (user_id, username, email, password_hash, created_at) VALUES
+('user-002','bob','bob@bookhive.test','x-hash-2',TIMESTAMP '2026-01-02 10:00:00 +00:00')
+/
+INSERT INTO users (user_id, username, email, password_hash, created_at) VALUES
+('user-003','carol','carol@bookhive.test','x-hash-3',TIMESTAMP '2026-01-03 10:00:00 +00:00')
+/
+
+INSERT INTO orders (order_id, user_id, total_price, status, purchased_at) VALUES
+('order-001','user-001',36.97,'COMPLETED',TIMESTAMP '2026-02-01 12:00:00 +00:00')
+/
+INSERT INTO orders (order_id, user_id, total_price, status, purchased_at) VALUES
+('order-002','user-001',18.99,'COMPLETED',TIMESTAMP '2026-02-10 12:00:00 +00:00')
+/
+INSERT INTO orders (order_id, user_id, total_price, status, purchased_at) VALUES
+('order-003','user-002',29.98,'PENDING',TIMESTAMP '2026-02-15 12:00:00 +00:00')
+/
+
+INSERT INTO order_items (order_item_id, order_id, book_id, quantity, price_at_purchase) VALUES
+('oi-001','order-001','book-001',1,12.99)
+/
+INSERT INTO order_items (order_item_id, order_id, book_id, quantity, price_at_purchase) VALUES
+('oi-002','order-001','book-003',2,11.99)
+/
+INSERT INTO order_items (order_item_id, order_id, book_id, quantity, price_at_purchase) VALUES
+('oi-003','order-002','book-006',1,18.99)
+/
+INSERT INTO order_items (order_item_id, order_id, book_id, quantity, price_at_purchase) VALUES
+('oi-004','order-003','book-008',2,14.99)
+/
+
+INSERT INTO cart_items (cart_item_id, user_id, book_id, quantity, added_at) VALUES
+('cart-001','user-001','book-005',1,TIMESTAMP '2026-03-01 09:00:00 +00:00')
+/
+INSERT INTO cart_items (cart_item_id, user_id, book_id, quantity, added_at) VALUES
+('cart-002','user-002','book-002',3,TIMESTAMP '2026-03-02 09:00:00 +00:00')
+/
+
+INSERT INTO marketplace_listings (listing_id, seller_id, book_id, item_condition, price, listed_at, status) VALUES
+('listing-001','user-001','book-004','USED_GOOD',6.50,TIMESTAMP '2026-03-05 08:00:00 +00:00','ACTIVE')
+/
+INSERT INTO marketplace_listings (listing_id, seller_id, book_id, item_condition, price, listed_at, status) VALUES
+('listing-002','user-002','book-007','LIKE_NEW',12.00,TIMESTAMP '2026-03-06 08:00:00 +00:00','ACTIVE')
+/
+INSERT INTO marketplace_listings (listing_id, seller_id, book_id, item_condition, price, listed_at, status) VALUES
+('listing-003','user-003','book-001','USED_FAIR',4.00,TIMESTAMP '2026-03-07 08:00:00 +00:00','SOLD')
+/

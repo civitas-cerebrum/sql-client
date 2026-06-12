@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { QueryBuilder } from '../src/builder/QueryBuilder';
+import { MssqlDialect, MySqlDialect, OracleDialect } from '../src/builder/Dialect';
+import { UnsupportedEngineException } from '../src/exceptions/SqlException';
 
 // simple select all
 {
@@ -82,3 +84,107 @@ console.log('query-builder.test.ts SELECT PASSED');
 }
 
 console.log('query-builder.test.ts WRITE PASSED');
+
+// Multi-row INSERT: values() accepts an array (or repeated calls), one tuple per row
+{
+    const { text, values } = QueryBuilder.insert('books')
+        .values([
+            { book_id: 'b1', title: 'Dune' },
+            { book_id: 'b2', title: '1984' },
+        ])
+        .toSql();
+    assert.equal(text, 'INSERT INTO "books" ("book_id", "title") VALUES ($1, $2), ($3, $4)');
+    assert.deepEqual(values, ['b1', 'Dune', 'b2', '1984']);
+}
+
+// repeated values() calls accumulate rows
+{
+    const { text, values } = QueryBuilder.insert('books')
+        .values({ book_id: 'b1', title: 'Dune' })
+        .values({ book_id: 'b2', title: '1984' })
+        .toSql();
+    assert.equal(text, 'INSERT INTO "books" ("book_id", "title") VALUES ($1, $2), ($3, $4)');
+    assert.deepEqual(values, ['b1', 'Dune', 'b2', '1984']);
+}
+
+// rows with mismatched columns are rejected
+{
+    assert.throws(
+        () => QueryBuilder.insert('books').values([{ a: 1 }, { b: 2 }]).toSql(),
+        /same columns/,
+    );
+}
+
+// INSERT ... RETURNING (suffix dialects: postgres/sqlite)
+{
+    const { text, values } = QueryBuilder.insert('books')
+        .values({ title: 'Dune' })
+        .returning('book_id', 'title')
+        .toSql();
+    assert.equal(text, 'INSERT INTO "books" ("title") VALUES ($1) RETURNING "book_id", "title"');
+    assert.deepEqual(values, ['Dune']);
+}
+
+// returning() with no args → all columns
+{
+    const { text } = QueryBuilder.insert('books').values({ title: 'Dune' }).returning().toSql();
+    assert.equal(text, 'INSERT INTO "books" ("title") VALUES ($1) RETURNING *');
+}
+
+// INSERT ... OUTPUT (inline dialect: mssql — clause sits before VALUES)
+{
+    const { text } = QueryBuilder.insert('books')
+        .values({ title: 'Dune' })
+        .returning('book_id')
+        .toSql(new MssqlDialect());
+    assert.equal(text, 'INSERT INTO [books] ([title]) OUTPUT INSERTED.[book_id] VALUES (@p1)');
+}
+
+// UPDATE ... RETURNING / OUTPUT (inline clause sits before WHERE)
+{
+    const { text, values } = QueryBuilder.update('books')
+        .set({ stock: 5 })
+        .where('book_id = ?', 'b1')
+        .returning('stock')
+        .toSql();
+    assert.equal(text, 'UPDATE "books" SET "stock" = $1 WHERE book_id = $2 RETURNING "stock"');
+    assert.deepEqual(values, [5, 'b1']);
+}
+{
+    const { text } = QueryBuilder.update('books')
+        .set({ stock: 5 })
+        .where('book_id = ?', 'b1')
+        .returning('stock')
+        .toSql(new MssqlDialect());
+    assert.equal(text, 'UPDATE [books] SET [stock] = @p1 OUTPUT INSERTED.[stock] WHERE book_id = @p2');
+}
+
+// DELETE ... RETURNING / OUTPUT (mssql reads from DELETED)
+{
+    const { text } = QueryBuilder.delete('books')
+        .where('book_id = ?', 'b1')
+        .returning()
+        .toSql();
+    assert.equal(text, 'DELETE FROM "books" WHERE book_id = $1 RETURNING *');
+}
+{
+    const { text } = QueryBuilder.delete('books')
+        .where('book_id = ?', 'b1')
+        .returning()
+        .toSql(new MssqlDialect());
+    assert.equal(text, 'DELETE FROM [books] OUTPUT DELETED.* WHERE book_id = @p1');
+}
+
+// engines without row-returning writes reject at compile time
+{
+    assert.throws(
+        () => QueryBuilder.insert('books').values({ a: 1 }).returning().toSql(new MySqlDialect()),
+        UnsupportedEngineException,
+    );
+    assert.throws(
+        () => QueryBuilder.insert('books').values({ a: 1 }).returning().toSql(new OracleDialect()),
+        UnsupportedEngineException,
+    );
+}
+
+console.log('query-builder.test.ts RETURNING PASSED');

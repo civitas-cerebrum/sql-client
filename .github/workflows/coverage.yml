@@ -1,0 +1,60 @@
+name: 📊 API Coverage Report
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🗂️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: 🧩 Install dependencies
+        run: npm ci
+
+      - name: 🛠️ Build package
+        run: npm run build
+
+      - name: 📊 Run API coverage
+        id: coverage
+        run: |
+          if npx test-coverage --format=github-plain; then
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 📦 Package coverage context for comment workflow
+        if: always()
+        run: |
+          mkdir -p coverage-context
+          echo "${{ github.event.pull_request.number }}" > coverage-context/pr-number.txt
+          echo "${{ steps.coverage.outputs.failed }}" > coverage-context/coverage-failed.txt
+          if [ -f test-coverage-report.md ]; then
+            cp test-coverage-report.md coverage-context/report.md
+          else
+            echo "⚠️ Coverage report was not generated." > coverage-context/report.md
+          fi
+
+      - name: 📤 Upload coverage context
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-context
+          path: coverage-context/
+          retention-days: 1
+
+      - name: ❌ Fail job if coverage below threshold
+        if: steps.coverage.outputs.failed == 'true'
+        run: |
+          echo "API coverage is below the required threshold. See the PR comment for details."
+          exit 1
