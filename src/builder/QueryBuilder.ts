@@ -1,4 +1,4 @@
-import { Dialect, PostgresDialect } from './Dialect';
+import { Dialect, PostgresDialect, ReturningClause, ReturningSource } from './Dialect';
 import { SqlResult } from '../models/SqlResult';
 
 type Kind = 'select' | 'insert' | 'update' | 'delete';
@@ -25,8 +25,9 @@ export class QueryBuilder {
     private _orderBy: { col: string; dir: 'asc' | 'desc' }[] = [];
     private _limit?: number;
     private _offset?: number;
-    private _insertRow?: Record<string, unknown>;
+    private _insertRows: Record<string, unknown>[] = [];
     private _setRow?: Record<string, unknown>;
+    private _returning?: string[];
 
     private constructor(private kind: Kind, private table: string) {}
 
@@ -43,8 +44,14 @@ export class QueryBuilder {
     orderBy(col: string, dir: 'asc' | 'desc' = 'asc'): this { this._orderBy.push({ col, dir }); return this; }
     limit(n: number): this { this._limit = n; return this; }
     offset(n: number): this { this._offset = n; return this; }
-    values(row: Record<string, unknown>): this { this._insertRow = row; return this; }
+    /** Add row(s) to insert. Repeated calls (or an array) accumulate into a multi-row INSERT. */
+    values(row: Record<string, unknown> | Record<string, unknown>[]): this {
+        this._insertRows.push(...(Array.isArray(row) ? row : [row]));
+        return this;
+    }
     set(row: Record<string, unknown>): this { this._setRow = row; return this; }
+    /** Make the write return rows (RETURNING / OUTPUT). No args → all columns. */
+    returning(...cols: string[]): this { this._returning = cols; return this; }
 
     /** Quote a column reference: per-segment for dotted names, raw for expressions. */
     private quoteColumn(d: Dialect, col: string): string {
@@ -103,33 +110,57 @@ export class QueryBuilder {
         return sql;
     }
 
+    /** Compile the RETURNING/OUTPUT clause if requested, else undefined. */
+    private compileReturning(d: Dialect, source: ReturningSource): ReturningClause | undefined {
+        return this._returning ? d.compileReturning(this._returning, source) : undefined;
+    }
+
     private buildInsert(d: Dialect, values: unknown[]): string {
-        if (!this._insertRow) throw new Error('insert() requires .values({...})');
-        const keys = Object.keys(this._insertRow);
+        if (this._insertRows.length === 0) throw new Error('insert() requires .values({...})');
+        const keys = Object.keys(this._insertRows[0]);
+        for (const row of this._insertRows) {
+            const rowKeys = Object.keys(row);
+            if (rowKeys.length !== keys.length || !keys.every((k) => k in row)) {
+                throw new Error('all rows passed to values() must have the same columns');
+            }
+        }
         const cols = keys.map((k) => d.quoteIdentifier(k)).join(', ');
-        const placeholders = keys.map((k, i) => { values.push(this._insertRow![k]); return d.placeholder(i + 1); }).join(', ');
-        return `INSERT INTO ${d.quoteIdentifier(this.table)} (${cols}) VALUES (${placeholders})`;
+        const tuples = this._insertRows
+            .map((row) => '(' + keys.map((k) => { values.push(row[k]); return d.placeholder(values.length); }).join(', ') + ')')
+            .join(', ');
+        const ret = this.compileReturning(d, 'inserted');
+        let sql = `INSERT INTO ${d.quoteIdentifier(this.table)} (${cols})`;
+        if (ret?.placement === 'inline') sql += ` ${ret.sql}`;
+        sql += ` VALUES ${tuples}`;
+        if (ret?.placement === 'suffix') sql += ` ${ret.sql}`;
+        return sql;
     }
 
     private buildUpdate(d: Dialect, values: unknown[]): string {
         if (!this._setRow) throw new Error('update() requires .set({...})');
         const keys = Object.keys(this._setRow);
         const assignments = keys.map((k) => { values.push(this._setRow![k]); return `${d.quoteIdentifier(k)} = ${d.placeholder(values.length)}`; }).join(', ');
+        const ret = this.compileReturning(d, 'inserted');
         let sql = `UPDATE ${d.quoteIdentifier(this.table)} SET ${assignments}`;
+        if (ret?.placement === 'inline') sql += ` ${ret.sql}`;
         sql += this.buildWhere(d, values);
+        if (ret?.placement === 'suffix') sql += ` ${ret.sql}`;
         return sql;
     }
 
     private buildDelete(d: Dialect, values: unknown[]): string {
+        const ret = this.compileReturning(d, 'deleted');
         let sql = `DELETE FROM ${d.quoteIdentifier(this.table)}`;
+        if (ret?.placement === 'inline') sql += ` ${ret.sql}`;
         sql += this.buildWhere(d, values);
+        if (ret?.placement === 'suffix') sql += ` ${ret.sql}`;
         return sql;
     }
 
-    /** Dispatch through a client: SELECT → query, everything else → execute. */
+    /** Dispatch through a client: SELECT and row-returning writes → query, everything else → execute. */
     async run<T = Record<string, unknown>>(client: RunnableClient): Promise<SqlResult<T>> {
         const { text, values } = this.toSql(client.dialect);
-        return this.kind === 'select'
+        return this.kind === 'select' || this._returning
             ? client.query<T>(text, values)
             : (client.execute(text, values) as Promise<SqlResult<T>>);
     }

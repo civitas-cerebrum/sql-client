@@ -1,6 +1,19 @@
+import { UnsupportedEngineException } from '../exceptions/SqlException';
+
+/** Which row image an inline OUTPUT clause reads (mssql): writes → INSERTED, deletes → DELETED. */
+export type ReturningSource = 'inserted' | 'deleted';
+
+/** A compiled row-returning clause and where the builder must splice it. */
+export interface ReturningClause {
+    sql: string;
+    /** 'suffix' → appended to the statement (RETURNING); 'inline' → before VALUES/WHERE (OUTPUT). */
+    placement: 'inline' | 'suffix';
+}
+
 /**
  * Strategy for rendering SQL that differs between engines: placeholder style,
- * identifier quoting, and pagination. One implementation per supported engine.
+ * identifier quoting, pagination, and row-returning writes. One implementation
+ * per supported engine.
  */
 export interface Dialect {
     /** Render the i-th positional placeholder (1-based). */
@@ -9,6 +22,12 @@ export interface Dialect {
     quoteIdentifier(name: string): string;
     /** Render the pagination clause (leading space included), engine-correct. */
     compilePagination(limit?: number, offset?: number): string;
+    /**
+     * Render the clause that makes a write return rows (RETURNING / OUTPUT).
+     * Empty `columns` means all columns. Throws UnsupportedEngineException
+     * where the engine has no equivalent (mysql, oracle).
+     */
+    compileReturning(columns: string[], source: ReturningSource): ReturningClause;
 }
 
 /** LIMIT/OFFSET pagination shared by Postgres, MySQL, SQLite. */
@@ -38,28 +57,44 @@ function offsetFetch(limit?: number, offset?: number): string {
     return ` OFFSET ${offset ?? 0} ROWS FETCH NEXT ${limit} ROWS ONLY`;
 }
 
+/** ANSI-style `RETURNING col, ...` appended to the statement (Postgres, SQLite). */
+function returningSuffix(d: Dialect, columns: string[]): ReturningClause {
+    const cols = columns.length ? columns.map((c) => d.quoteIdentifier(c)).join(', ') : '*';
+    return { sql: `RETURNING ${cols}`, placement: 'suffix' };
+}
+
 export class PostgresDialect implements Dialect {
     placeholder(index: number): string { return `$${index}`; }
     quoteIdentifier(name: string): string { return `"${name.replace(/"/g, '""')}"`; }
     compilePagination(limit?: number, offset?: number): string { return limitOffset(limit, offset); }
+    compileReturning(columns: string[]): ReturningClause { return returningSuffix(this, columns); }
 }
 
 export class MySqlDialect implements Dialect {
     placeholder(_index: number): string { return '?'; }
     quoteIdentifier(name: string): string { return `\`${name.replace(/`/g, '``')}\``; }
     compilePagination(limit?: number, offset?: number): string { return limitOffsetWithSentinel('18446744073709551615', limit, offset); }
+    compileReturning(): ReturningClause {
+        throw new UnsupportedEngineException('mysql cannot return rows from writes — issue a follow-up SELECT instead.');
+    }
 }
 
 export class SqliteDialect implements Dialect {
     placeholder(_index: number): string { return '?'; }
     quoteIdentifier(name: string): string { return `"${name.replace(/"/g, '""')}"`; }
     compilePagination(limit?: number, offset?: number): string { return limitOffsetWithSentinel('-1', limit, offset); }
+    compileReturning(columns: string[]): ReturningClause { return returningSuffix(this, columns); }
 }
 
 export class MssqlDialect implements Dialect {
     placeholder(index: number): string { return `@p${index}`; }
     quoteIdentifier(name: string): string { return `[${name.replace(/]/g, ']]')}]`; }
     compilePagination(limit?: number, offset?: number): string { return offsetFetch(limit, offset); }
+    compileReturning(columns: string[], source: ReturningSource): ReturningClause {
+        const image = source === 'deleted' ? 'DELETED' : 'INSERTED';
+        const cols = columns.length ? columns.map((c) => `${image}.${this.quoteIdentifier(c)}`).join(', ') : `${image}.*`;
+        return { sql: `OUTPUT ${cols}`, placement: 'inline' };
+    }
 }
 
 export class OracleDialect implements Dialect {
@@ -68,4 +103,7 @@ export class OracleDialect implements Dialect {
     // so both sides agree. Avoids the quoted-lowercase case-mismatch footgun. (No reserved-word cols.)
     quoteIdentifier(name: string): string { return name; }
     compilePagination(limit?: number, offset?: number): string { return offsetFetch(limit, offset); }
+    compileReturning(): ReturningClause {
+        throw new UnsupportedEngineException('oracle RETURNING INTO needs out-binds, which this builder does not support — issue a follow-up SELECT instead.');
+    }
 }

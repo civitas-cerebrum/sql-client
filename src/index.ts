@@ -6,7 +6,7 @@ export type { SqlClientConfig, SqlTransaction } from './client/SqlClient';
 export { QueryBuilder } from './builder/QueryBuilder';
 export type { RunnableClient } from './builder/QueryBuilder';
 export { PostgresDialect, MySqlDialect, SqliteDialect, MssqlDialect, OracleDialect } from './builder/Dialect';
-export type { Dialect } from './builder/Dialect';
+export type { Dialect, ReturningClause, ReturningSource } from './builder/Dialect';
 
 // Models
 export type { SqlResult, SqlField } from './models/SqlResult';

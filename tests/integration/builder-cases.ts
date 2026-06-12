@@ -25,6 +25,7 @@ import assert from 'node:assert/strict';
 import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { SqlClient } from '../../src/client/SqlClient';
 import { rows } from '../../src/result/ResultSet';
+import { UnsupportedEngineException } from '../../src/exceptions/SqlException';
 
 export async function runBuilderCases(client: SqlClient): Promise<void> {
     const e = client.engine;
@@ -386,6 +387,90 @@ export async function runBuilderCases(client: SqlClient): Promise<void> {
         } else if (e === 'oracle') {
             assert.ok(text.includes('books'), `BC-15 oracle: table 'books' should appear in text`);
             assert.ok(text.includes(':1') && text.includes(':2'), `BC-15 oracle: should use :1/:2 placeholders`);
+        }
+    }
+
+    // ==========================================================================
+    // BC-16: multi-row INSERT — one statement, two rows, rowCount=2
+    // ==========================================================================
+    {
+        const ids = ['bc-multi-1', 'bc-multi-2'];
+        try {
+            const ins = await QueryBuilder
+                .insert('books')
+                .values(ids.map((id, i) => ({
+                    book_id: id,
+                    title: `Multi Row ${i + 1}`,
+                    author: 'Builder Author',
+                    genre: 'Fiction',
+                    description: 'Multi-row insert test.',
+                    price: 1.99 + i,
+                    cover_image: null,
+                    stock: i,
+                    isbn: null,
+                })))
+                .run(client);
+            assert.equal(ins.rowCount, 2, `BC-16 INSERT: expected rowCount=2, got ${ins.rowCount}`);
+
+            const sel = await QueryBuilder
+                .select('books')
+                .columns('book_id', 'title')
+                .where('book_id IN (?, ?)', ...ids)
+                .orderBy('book_id')
+                .run(client);
+            assert.deepEqual(rows(sel).column('book_id').map(String), ids, `BC-16 SELECT-back: ids mismatch`);
+        } finally {
+            await QueryBuilder.delete('books').where('book_id IN (?, ?)', ...ids).run(client).catch(() => {});
+        }
+    }
+
+    // ==========================================================================
+    // BC-17: RETURNING/OUTPUT — writes hand back rows on postgres/sqlite/mssql;
+    // mysql/oracle reject at compile time with UnsupportedEngineException
+    // ==========================================================================
+    {
+        const tempId = 'bc-ret-tmp';
+        const row = {
+            book_id: tempId,
+            title: 'Returning Test Book',
+            author: 'Builder Author',
+            genre: 'Fiction',
+            description: 'RETURNING test.',
+            price: 5.49,
+            cover_image: null,
+            stock: 7,
+            isbn: null,
+        };
+        if (e === 'mysql' || e === 'oracle') {
+            assert.throws(
+                () => QueryBuilder.insert('books').values(row).returning('book_id').toSql(client.dialect),
+                UnsupportedEngineException,
+                `BC-17 ${e}: returning() should throw UnsupportedEngineException`,
+            );
+        } else {
+            try {
+                const ins = await QueryBuilder.insert('books').values(row).returning('book_id', 'title').run(client);
+                const insRow = rows(ins).one();
+                assert.equal(insRow.string('book_id'), tempId, `BC-17 INSERT..RETURNING: book_id mismatch`);
+                assert.equal(insRow.string('title'), 'Returning Test Book', `BC-17 INSERT..RETURNING: title mismatch`);
+
+                const upd = await QueryBuilder
+                    .update('books')
+                    .set({ stock: 9 })
+                    .where('book_id = ?', tempId)
+                    .returning('stock')
+                    .run(client);
+                assert.equal(rows(upd).one().number('stock'), 9, `BC-17 UPDATE..RETURNING: stock should be 9`);
+
+                const del = await QueryBuilder
+                    .delete('books')
+                    .where('book_id = ?', tempId)
+                    .returning()
+                    .run(client);
+                assert.equal(rows(del).one().string('book_id'), tempId, `BC-17 DELETE..RETURNING: book_id mismatch`);
+            } finally {
+                await QueryBuilder.delete('books').where('book_id = ?', tempId).run(client).catch(() => {});
+            }
         }
     }
 }
