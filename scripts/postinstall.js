@@ -4,6 +4,12 @@ const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
 
+// Opt-out for CI/containers that don't want skills copied anywhere.
+if (process.env.SQL_CLIENT_SKIP_SKILLS) {
+  console.log('[@civitas-cerebrum/sql-client] SQL_CLIENT_SKIP_SKILLS set — skipping skill install.');
+  process.exit(0);
+}
+
 const packageDir = path.resolve(__dirname, '..');
 const skillsDir  = path.join(packageDir, 'skills');
 

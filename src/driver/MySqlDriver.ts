@@ -1,5 +1,5 @@
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
+import { UnsupportedEngineException, isModuleNotFound, wrapQueryError } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -11,11 +11,17 @@ export class MySqlDriver implements SqlDriver {
     constructor(config: DriverConfig) {
         let mysql: typeof import('mysql2/promise');
         try { mysql = require('mysql2/promise'); }
-        catch { throw new UnsupportedEngineException('Install "mysql2" to use the mysql engine.'); }
+        catch (err) {
+            if (isModuleNotFound(err, 'mysql2')) throw new UnsupportedEngineException('Install "mysql2" to use the mysql engine.');
+            throw err;
+        }
+        const timeout = config.connectTimeoutMs !== undefined ? { connectTimeout: config.connectTimeoutMs } : {};
         if (config.connectionString) {
-            this.pool = mysql.createPool(config.connectionString);
+            this.pool = config.connectTimeoutMs !== undefined
+                ? mysql.createPool({ uri: config.connectionString, ...timeout })
+                : mysql.createPool(config.connectionString);
         } else {
-            this.pool = mysql.createPool((config.connection as import('mysql2/promise').PoolOptions) ?? {});
+            this.pool = mysql.createPool({ ...((config.connection as import('mysql2/promise').PoolOptions) ?? {}), ...timeout });
         }
     }
     private toResult<T>(rowsOrHeader: unknown, fields: unknown): SqlResult<T> {
@@ -29,20 +35,21 @@ export class MySqlDriver implements SqlDriver {
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<SqlResult<T>> {
         log('query %s %o', sql, params);
         try { const [rows, fields] = await this.pool.query(sql, params); return this.toResult<T>(rows, fields); }
-        catch (cause) { throw new QueryFailedException(`Query failed: ${(cause as Error).message}`, sql, params, cause); }
+        catch (cause) { log('query failed: %s', (cause as Error).message); throw wrapQueryError('mysql', sql, params, cause); }
     }
     async execute(sql: string, params: unknown[] = []): Promise<SqlResult> { return this.query(sql, params); }
     async transaction<R>(fn: (tx: DriverTransaction) => Promise<R>): Promise<R> {
         const conn = await this.pool.getConnection();
         const tx: DriverTransaction = {
             query: async <T>(sql: string, params: unknown[] = []) => {
+                log('query %s %o', sql, params);
                 try { const [rows, fields] = await conn.query(sql, params); return this.toResult<T>(rows, fields); }
-                catch (cause) { throw new QueryFailedException(`Query failed: ${(cause as Error).message}`, sql, params, cause); }
+                catch (cause) { log('query failed: %s', (cause as Error).message); throw wrapQueryError('mysql', sql, params, cause); }
             },
             execute: (sql: string, params: unknown[] = []) => tx.query(sql, params),
         };
-        try { await conn.beginTransaction(); const r = await fn(tx); await conn.commit(); return r; }
-        catch (err) { await conn.rollback(); throw err; }
+        try { log('begin'); await conn.beginTransaction(); const r = await fn(tx); log('commit'); await conn.commit(); return r; }
+        catch (err) { log('rollback'); await conn.rollback(); throw err; }
         finally { conn.release(); }
     }
     async end(): Promise<void> { await this.pool.end(); }

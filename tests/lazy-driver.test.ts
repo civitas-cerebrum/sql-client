@@ -58,4 +58,22 @@ try {
     (Module as unknown as { _load: (...a: unknown[]) => unknown })._load = origLoad;
 }
 
+// A require() failure that is NOT the module being absent (e.g. a native ABI
+// mismatch inside an installed driver) must propagate unchanged — converting
+// it to UnsupportedEngineException would hide the real problem.
+const abiError = new Error('The module was compiled against a different Node.js version (NODE_MODULE_VERSION mismatch)');
+(Module as unknown as { _load: (...a: unknown[]) => unknown })._load = function (request: unknown, ...rest: unknown[]) {
+    if (request === 'pg') throw abiError;
+    return origLoad.call(this, request, ...rest);
+};
+try {
+    assert.throws(
+        () => new PostgresDriver({ connectionString: 'postgres://u:p@localhost/db' }),
+        (e: unknown) => e === abiError,
+        'a non-MODULE_NOT_FOUND require failure must rethrow the original error',
+    );
+} finally {
+    (Module as unknown as { _load: (...a: unknown[]) => unknown })._load = origLoad;
+}
+
 console.log('lazy-driver.test.ts PASSED');

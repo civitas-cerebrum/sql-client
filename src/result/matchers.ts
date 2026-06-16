@@ -9,13 +9,39 @@ function n(v: unknown): number {
     return Number(v);
 }
 
-/** Loose-equality (String compare). */
+/**
+ * Numeric value of a side, or null if it isn't safely numeric. Strings only
+ * count when they're a canonical decimal (`-?digits[.digits]`) — so a DECIMAL
+ * column's "6.50" coerces, but "", whitespace, "0x10", and "1e3" do NOT (those
+ * would otherwise silently equal 0/16/1000 and make an assertion lie).
+ */
+function numericValue(v: unknown): number | null {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v === 'bigint') return Number(v);
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+    return null;
+}
+
+/**
+ * Loose equality across engine value representations: when both sides are
+ * numeric ("6.50" vs 6.5) compare as numbers, else as strings. A non-numeric
+ * string never coerces, so blank/whitespace cells don't spuriously match 0.
+ */
+export function looseEquals(a: unknown, b: unknown): boolean {
+    const na = numericValue(a);
+    const nb = numericValue(b);
+    if (na !== null && nb !== null) return na === nb;
+    return String(a) === String(b);
+}
+
+/** Loose-equality (numeric-aware String compare). */
 export function eq(expected: unknown): Matcher {
-    return (value) => String(value) === String(expected);
+    return (value) => looseEquals(value, expected);
 }
 /** Loose-inequality. */
 export function ne(expected: unknown): Matcher {
-    return (value) => String(value) !== String(expected);
+    return (value) => !looseEquals(value, expected);
 }
 
 export function lt(bound: number): Matcher { return (v) => { const x = n(v); return !Number.isNaN(x) && x < bound; }; }
@@ -28,8 +54,7 @@ export function between(min: number, max: number): Matcher {
 }
 
 export function oneOf(values: unknown[]): Matcher {
-    const set = values.map((x) => String(x));
-    return (value) => set.includes(String(value));
+    return (value) => values.some((x) => looseEquals(value, x));
 }
 
 /** Escape RegExp metacharacters EXCEPT we handle % and _ ourselves. */

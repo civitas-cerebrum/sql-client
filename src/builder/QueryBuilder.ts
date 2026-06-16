@@ -1,8 +1,15 @@
-import { Dialect, PostgresDialect, ReturningClause, ReturningSource } from './Dialect';
+import { Dialect, ReturningClause, ReturningSource } from './Dialect';
 import { SqlResult } from '../models/SqlResult';
+import { SqlException } from '../exceptions/SqlException';
+import { rows, ResultSet, Row } from '../result/ResultSet';
 
 type Kind = 'select' | 'insert' | 'update' | 'delete';
 interface WhereFrag { clause: string; params: unknown[]; }
+type WhereCond =
+    | { kind: 'raw'; clause: string; params: unknown[] }
+    | { kind: 'in'; col: string; values: unknown[] }
+    | { kind: 'null'; col: string }
+    | { kind: 'notnull'; col: string };
 
 /** Minimal client shape QueryBuilder needs to dispatch via `.run()`. */
 export interface RunnableClient {
@@ -19,7 +26,7 @@ export interface RunnableClient {
 export class QueryBuilder {
     private _columns: string[] = [];
     private _joins: { table: string; on: string }[] = [];
-    private _wheres: WhereFrag[] = [];
+    private _wheres: WhereCond[] = [];
     private _groupBy: string[] = [];
     private _having: WhereFrag[] = [];
     private _orderBy: { col: string; dir: 'asc' | 'desc' }[] = [];
@@ -38,7 +45,14 @@ export class QueryBuilder {
 
     columns(...cols: string[]): this { this._columns.push(...cols); return this; }
     join(table: string, on: string): this { this._joins.push({ table, on }); return this; }
-    where(clause: string, ...params: unknown[]): this { this._wheres.push({ clause, params }); return this; }
+    where(clause: string, ...params: unknown[]): this { this._wheres.push({ kind: 'raw', clause, params }); return this; }
+    whereIn(col: string, values: unknown[]): this {
+        if (values.length === 0) throw new SqlException('whereIn() requires a non-empty array');
+        this._wheres.push({ kind: 'in', col, values });
+        return this;
+    }
+    whereNull(col: string): this { this._wheres.push({ kind: 'null', col }); return this; }
+    whereNotNull(col: string): this { this._wheres.push({ kind: 'notnull', col }); return this; }
     groupBy(...cols: string[]): this { this._groupBy.push(...cols); return this; }
     having(clause: string, ...params: unknown[]): this { this._having.push({ clause, params }); return this; }
     orderBy(col: string, dir: 'asc' | 'desc' = 'asc'): this { this._orderBy.push({ col, dir }); return this; }
@@ -65,7 +79,7 @@ export class QueryBuilder {
         return clause.replace(/\?/g, () => d.placeholder(i++));
     }
 
-    toSql(dialect: Dialect = new PostgresDialect()): { text: string; values: unknown[] } {
+    toSql(dialect: Dialect): { text: string; values: unknown[] } {
         const values: unknown[] = [];
         let text: string;
         switch (this.kind) {
@@ -80,9 +94,19 @@ export class QueryBuilder {
     private buildWhere(d: Dialect, values: unknown[]): string {
         if (this._wheres.length === 0) return '';
         const parts = this._wheres.map((w) => {
-            const rendered = this.renderFragment(d, w.clause, values.length + 1);
-            values.push(...w.params);
-            return rendered;
+            switch (w.kind) {
+                case 'raw': {
+                    const rendered = this.renderFragment(d, w.clause, values.length + 1);
+                    values.push(...w.params);
+                    return rendered;
+                }
+                case 'in': {
+                    const marks = w.values.map((v) => { values.push(v); return d.placeholder(values.length); });
+                    return `${this.quoteColumn(d, w.col)} IN (${marks.join(', ')})`;
+                }
+                case 'null': return `${this.quoteColumn(d, w.col)} IS NULL`;
+                case 'notnull': return `${this.quoteColumn(d, w.col)} IS NOT NULL`;
+            }
         });
         return ' WHERE ' + parts.join(' AND ');
     }
@@ -164,4 +188,29 @@ export class QueryBuilder {
             ? client.query<T>(text, values)
             : (client.execute(text, values) as Promise<SqlResult<T>>);
     }
+
+    /** run() + rows(): dispatch and wrap straight into a ResultSet. */
+    async fetch<T extends object = Record<string, unknown>>(client: RunnableClient): Promise<ResultSet<T>> {
+        return rows(await this.run<T>(client));
+    }
+    async one<T extends object = Record<string, unknown>>(client: RunnableClient): Promise<Row<T>> {
+        return (await this.fetch<T>(client)).one();
+    }
+    async maybeOne<T extends object = Record<string, unknown>>(client: RunnableClient): Promise<Row<T> | undefined> {
+        return (await this.fetch<T>(client)).maybeOne();
+    }
+    async scalar<V = unknown>(client: RunnableClient, column?: string): Promise<V | null | undefined> {
+        return (await this.fetch(client)).scalar<V>(column);
+    }
+
+    /** SELECT COUNT(*) honouring only the WHERE clauses. Number()-coerced (postgres returns string). */
+    async count(client: RunnableClient): Promise<number> {
+        if (this._groupBy.length || this._having.length || this._joins.length) {
+            throw new SqlException('count() with groupBy/having/join is ambiguous — use a raw query instead.');
+        }
+        const values: unknown[] = [];
+        const text = `SELECT COUNT(*) AS cnt FROM ${client.dialect.quoteIdentifier(this.table)}${this.buildWhere(client.dialect, values)}`;
+        return Number(rows(await client.query<Record<string, unknown>>(text, values)).scalar('cnt'));
+    }
+    async exists(client: RunnableClient): Promise<boolean> { return (await this.count(client)) > 0; }
 }

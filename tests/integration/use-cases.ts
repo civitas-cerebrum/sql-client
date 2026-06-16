@@ -16,10 +16,9 @@
  *   LIMIT/OFFSET vs OFFSET..FETCH).
  * - Raw SQL uses unquoted lowercase identifiers (Oracle folds unquoted to
  *   UPPERCASE; schema was created the same way, so both sides agree).
- * - The MSSQL reserved-word column `[status]` only appears in raw INSERT
- *   strings; a one-line switch provides the bracketed spelling for that engine.
- *   `status` unbracketed works fine in SELECT/WHERE; the bracket is only
- *   required in INSERT column lists for mssql.
+ * - The T-SQL reserved-word column `status` is only written through the
+ *   builder, whose quoteIdentifier brackets it per engine. Unbracketed
+ *   `status` works fine in raw SELECT/WHERE on all engines.
  * - Oracle `TIMESTAMP WITH TIME ZONE` columns bound as JS `Date` objects work
  *   correctly through the oracledb driver; string literals do not reliably
  *   parse.  All parametrised date/timestamp values are therefore `new Date(...)`.
@@ -29,7 +28,7 @@ import assert from 'node:assert/strict';
 import { SqlClient } from '../../src/client/SqlClient';
 import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { QueryFailedException } from '../../src/exceptions/SqlException';
-import { ph, statusCol, bindDate } from './_helpers';
+import { ph, bindDate } from './_helpers';
 import { rows } from '../../src/result/ResultSet';
 
 // ---------------------------------------------------------------------------
@@ -367,25 +366,24 @@ export async function runUseCases(client: SqlClient): Promise<void> {
     // -----------------------------------------------------------------------
     {
         const tempOrderId = 'uc-tx-commit';
-        const sc = statusCol(e);
 
         await client.transaction(async (tx) => {
+            // `stock = stock - 1` is an expression the builder can't bind — keep it raw.
             await tx.execute(
                 `UPDATE books SET stock = stock - 1 WHERE book_id = ${ph(client, 1)}`,
                 ['book-002'],
             );
-            const oInsSQL = [
-                'INSERT INTO orders',
-                `(order_id, user_id, total_price, ${sc}, purchased_at)`,
-                `VALUES (${ph(client, 1)}, ${ph(client, 2)}, ${ph(client, 3)}, ${ph(client, 4)}, ${ph(client, 5)})`,
-            ].join(' ');
-            await tx.execute(oInsSQL, [
-                tempOrderId,
-                'user-003',
-                10.99,
-                'COMPLETED',
-                bindDate(client, '2026-04-02T00:00:00Z'),
-            ]);
+            // The tx handle carries the dialect, so the builder runs inside the transaction.
+            // quoteIdentifier handles the reserved-word `status` column per engine (no statusCol()).
+            await QueryBuilder.insert('orders')
+                .values({
+                    order_id: tempOrderId,
+                    user_id: 'user-003',
+                    total_price: 10.99,
+                    status: 'COMPLETED',
+                    purchased_at: bindDate(client, '2026-04-02T00:00:00Z'),
+                })
+                .run(tx);
         });
 
         const stockSQL = `SELECT stock FROM books WHERE book_id = ${ph(client, 1)}`;
@@ -401,10 +399,8 @@ export async function runUseCases(client: SqlClient): Promise<void> {
             );
         } finally {
             // Clean up: delete temp order and restore stock
-            const delOrdSQL = `DELETE FROM orders WHERE order_id = ${ph(client, 1)}`;
-            await client.execute(delOrdSQL, [tempOrderId]).catch(() => {});
-            const restoreSQL = `UPDATE books SET stock = 12 WHERE book_id = ${ph(client, 1)}`;
-            await client.execute(restoreSQL, ['book-002']).catch(() => {});
+            await QueryBuilder.delete('orders').where('order_id = ?', tempOrderId).run(client).catch(() => {});
+            await QueryBuilder.update('books').set({ stock: 12 }).where('book_id = ?', 'book-002').run(client).catch(() => {});
         }
 
         // Confirm cleanup

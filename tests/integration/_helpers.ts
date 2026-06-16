@@ -54,11 +54,10 @@ export function conditionCol(client: SqlClient): string {
 /**
  * Return a date value suitable for binding as a timestamp parameter.
  *
- * Per-engine override: SQLite (better-sqlite3) rejects Date objects; it only
- * accepts numbers, strings, bigints, buffers, and null. All other engines
- * accept a JS Date object and map it to the correct timestamp type. For
- * Oracle the oracledb driver handles Date→TIMESTAMP WITH TIME ZONE correctly.
+ * All engines accept a JS Date object directly: SqliteDriver normalizes
+ * Date→ISO string for better-sqlite3, the other native drivers map Date to
+ * the correct timestamp type themselves.
  */
-export function bindDate(client: SqlClient, iso: string): unknown {
-    return client.engine === 'sqlite' ? iso : new Date(iso);
+export function bindDate(_client: SqlClient, iso: string): unknown {
+    return new Date(iso);
 }

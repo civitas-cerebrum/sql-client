@@ -17,6 +17,19 @@ jobs:
       - name: 🗂️  Checkout repository
         uses: actions/checkout@v4
 
+      # Guard against accidental/experiment tags: the tag (optionally v-prefixed)
+      # must match package.json's version or we refuse to publish.
+      - name: 🔖  Verify tag matches package version
+        run: |
+          node -e '
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+            const version = require("./package.json").version;
+            if (tag !== version) {
+              console.error(`Tag "${process.env.GITHUB_REF_NAME}" does not match package.json version "${version}" — refusing to publish.`);
+              process.exit(1);
+            }
+          '
+
       - name: ⚙️  Set up Node.js
         uses: actions/setup-node@v4
         with:

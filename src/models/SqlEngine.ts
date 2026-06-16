@@ -8,4 +8,6 @@ export interface DriverConfig {
     connection?: Record<string, unknown>;
     /** Max pool size where the engine pools. Default 10. */
     max?: number;
+    /** Connection-establishment timeout in milliseconds. Only applied where provided; no implicit default. */
+    connectTimeoutMs?: number;
 }

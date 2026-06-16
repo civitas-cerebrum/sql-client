@@ -4,6 +4,8 @@ import { SqlClient } from '../../src/client/SqlClient';
 import { runUseCases } from './use-cases';
 import { runLookups } from './lookups';
 import { runBuilderCases } from './builder-cases';
+import { runSchemaMap, runCoverageReport } from './schema-map';
+import { runDbCoverage } from './db-coverage';
 
 const BASE_CONFIG = {
     engine: 'mssql' as const,
@@ -30,15 +32,15 @@ async function main() {
     const schemaPath = join(__dirname, '../sql/mssql.schema.sql');
     const seedPath = join(__dirname, '../sql/mssql.seed.sql');
     for (const filePath of [schemaPath, seedPath]) {
-        const sql = readFileSync(filePath, 'utf8');
-        for (const stmt of sql.split(';').map((s) => s.trim()).filter(Boolean)) {
-            await client.execute(stmt);
-        }
+        await client.runScript(readFileSync(filePath, 'utf8'));
     }
 
     await runUseCases(client);
     await runLookups(client);
     await runBuilderCases(client);
+    await runSchemaMap(client);
+    const __ledger = await runDbCoverage(client);
+    await runCoverageReport(client, __ledger);
     await client.end();
     console.log('integration/mssql.test.ts PASSED');
 }

@@ -1,6 +1,6 @@
 {
   "name": "@civitas-cerebrum/sql-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight multi-engine SQL client (Postgres, MySQL, SQLite, SQL Server, Oracle) with a fluent query builder, typed results, and parametrised queries.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,14 +12,14 @@
     "./package.json": "./package.json"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "test:unit": "npx tsx tests/dialects.test.ts && npx tsx tests/pagination.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/engine-detection.test.ts && npx tsx tests/factories.test.ts && npx tsx tests/result.test.ts && npx tsx tests/matchers.test.ts && npx tsx tests/lazy-driver.test.ts",
+    "test:unit": "npx tsx tests/dialects.test.ts && npx tsx tests/pagination.test.ts && npx tsx tests/query-builder.test.ts && npx tsx tests/builder-terminals.test.ts && npx tsx tests/engine-detection.test.ts && npx tsx tests/factories.test.ts && npx tsx tests/result.test.ts && npx tsx tests/matchers.test.ts && npx tsx tests/sql-tag.test.ts && npx tsx tests/sql-script.test.ts && npx tsx tests/driver-errors.test.ts && npx tsx tests/lazy-driver.test.ts",
     "test:sqlite": "npx tsx tests/integration/sqlite.test.ts",
     "test:postgres": "npx tsx tests/integration/postgres.test.ts",
     "test:mysql": "npx tsx tests/integration/mysql.test.ts",
@@ -28,12 +28,13 @@
     "test": "npm run test:unit && npm run test:sqlite",
     "test:all-engines": "npm run test:unit && npm run test:postgres && npm run test:sqlite && npm run test:mysql && npm run test:mssql && npm run test:oracle",
     "postinstall": "node scripts/postinstall.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && npm test"
   },
   "files": [
     "dist",
     "skills",
-    "scripts/postinstall.js"
+    "scripts/postinstall.js",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "debug": "^4.4.3"
@@ -81,13 +82,17 @@
   "keywords": [
     "postgres",
     "mysql",
+    "mariadb",
     "sqlite",
     "mssql",
+    "sql-server",
     "oracle",
     "sql",
     "query-builder",
     "database",
     "test-automation",
+    "testing",
+    "typescript",
     "multi-engine"
   ],
   "publishConfig": {
@@ -97,6 +102,8 @@
     "type": "git",
     "url": "git+https://github.com/civitas-cerebrum/sql-client.git"
   },
+  "homepage": "https://github.com/civitas-cerebrum/sql-client#readme",
+  "bugs": "https://github.com/civitas-cerebrum/sql-client/issues",
   "author": "Umut Ay Bora",
   "license": "MIT"
 }

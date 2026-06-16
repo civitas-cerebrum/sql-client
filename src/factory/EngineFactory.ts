@@ -40,5 +40,7 @@ export function detectEngine(connectionString: string): SqlEngine {
     if (s.startsWith('sqlite:') || s.startsWith('file:') || s === ':memory:' || s.endsWith('.db') || s.endsWith('.sqlite')) return 'sqlite';
     if (s.startsWith('mssql://') || s.startsWith('sqlserver://')) return 'mssql';
     if (s.startsWith('oracle://') || s.startsWith('oracledb://')) return 'oracle';
-    throw new UnsupportedEngineException(`Unable to detect SQL engine from connection string "${connectionString}". Pass an explicit { engine } or use a known scheme.`);
+    // Redact userinfo passwords before echoing the connection string into an error message.
+    const redacted = connectionString.replace(/\/\/([^:@\/]+):([^@\/]+)@/, '//$1:***@');
+    throw new UnsupportedEngineException(`Unable to detect SQL engine from connection string "${redacted}". Pass an explicit { engine } or use a known scheme: postgres://, postgresql://, mysql://, mariadb://, sqlite:, file:, :memory:, mssql://, sqlserver://, oracle://, oracledb://.`);
 }

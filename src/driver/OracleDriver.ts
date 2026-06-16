@@ -1,5 +1,5 @@
 import { SqlResult } from '../models/SqlResult';
-import { QueryFailedException, UnsupportedEngineException } from '../exceptions/SqlException';
+import { QueryFailedException, UnsupportedEngineException, isModuleNotFound, wrapQueryError } from '../exceptions/SqlException';
 import { SqlDriver, DriverTransaction } from './SqlDriver';
 import { DriverConfig } from '../models/SqlEngine';
 import { createLogger } from '../logger/Logger';
@@ -13,9 +13,14 @@ export class OracleDriver implements SqlDriver {
     private poolPromise: Promise<import('oracledb').Pool> | null = null;
     constructor(config: DriverConfig) {
         try { this.oracledb = require('oracledb'); }
-        catch { throw new UnsupportedEngineException('Install "oracledb" to use the oracle engine.'); }
+        catch (err) {
+            if (isModuleNotFound(err, 'oracledb')) throw new UnsupportedEngineException('Install "oracledb" to use the oracle engine.');
+            throw err;
+        }
         if (!config.connection && !config.connectionString) throw new QueryFailedException('Provide connection or connectionString for the oracle engine.', '', []);
         this.connAttrs = (config.connection as import('oracledb').PoolAttributes) ?? this.parseUrl(config.connectionString!);
+        // oracledb's connectTimeout is in seconds, not milliseconds.
+        if (config.connectTimeoutMs !== undefined) this.connAttrs = { ...this.connAttrs, connectTimeout: Math.ceil(config.connectTimeoutMs / 1000) };
         this.poolMax = config.max ?? 10;
     }
     private getPool(): Promise<import('oracledb').Pool> {
@@ -36,7 +41,7 @@ export class OracleDriver implements SqlDriver {
         log('query %s %o', sql, params);
         const pool = await this.getPool(); const conn = await pool.getConnection();
         try { return this.toResult<T>(await conn.execute<T>(sql, params, { autoCommit: true, outFormat: this.oracledb.OUT_FORMAT_OBJECT })); }
-        catch (cause) { throw new QueryFailedException(`Query failed: ${(cause as Error).message}`, sql, params, cause); }
+        catch (cause) { log('query failed: %s', (cause as Error).message); throw wrapQueryError('oracle', sql, params, cause); }
         finally { await conn.close(); }
     }
     async execute(sql: string, params: unknown[] = []): Promise<SqlResult> { return this.query(sql, params); }
@@ -44,13 +49,15 @@ export class OracleDriver implements SqlDriver {
         const pool = await this.getPool(); const conn = await pool.getConnection();
         const tx: DriverTransaction = {
             query: async <T>(sql: string, params: unknown[] = []) => {
+                log('query %s %o', sql, params);
                 try { return this.toResult<T>(await conn.execute<T>(sql, params, { autoCommit: false, outFormat: this.oracledb.OUT_FORMAT_OBJECT })); }
-                catch (cause) { throw new QueryFailedException(`Query failed: ${(cause as Error).message}`, sql, params, cause); }
+                catch (cause) { log('query failed: %s', (cause as Error).message); throw wrapQueryError('oracle', sql, params, cause); }
             },
             execute: (sql: string, params: unknown[] = []) => tx.query(sql, params),
         };
-        try { const r = await fn(tx); await conn.commit(); return r; }
+        try { log('begin'); const r = await fn(tx); log('commit'); await conn.commit(); return r; }
         catch (err) {
+            log('rollback');
             try { await conn.rollback(); } catch { /* ignore secondary rollback error */ }
             throw err;
         }
