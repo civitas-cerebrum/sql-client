@@ -8,6 +8,12 @@ export type { RunnableClient } from './builder/QueryBuilder';
 export { PostgresDialect, MySqlDialect, SqliteDialect, MssqlDialect, OracleDialect } from './builder/Dialect';
 export type { Dialect, ReturningClause, ReturningSource } from './builder/Dialect';
 
+// SQL tagged template
+export { sql, SqlFragment, SqlIdentifier } from './builder/SqlTag';
+
+// Script splitting
+export { splitSqlScript } from './script/SqlScript';
+
 // Models
 export type { SqlResult, SqlField } from './models/SqlResult';
 export type { SqlEngine, DriverConfig } from './models/SqlEngine';
@@ -18,6 +24,7 @@ export { SqlException, QueryFailedException, UnsupportedEngineException } from '
 // Result accessors
 export { getValue, getString, getNumber, getBoolean, getColumn, findRow, filterRows, getScalar } from './result/accessors';
 export { rows, ResultSet, Row } from './result/ResultSet';
+export type { ColumnOf } from './result/ResultSet';
 export { ResultError } from './exceptions/SqlException';
 
 // Row matchers
@@ -27,6 +34,7 @@ export type { RowPredicate } from './result/accessors';
 
 // Logger
 export { log, createLogger } from './logger/Logger';
+export type { SqlLogger } from './logger/Logger';
 
 // Engine / driver / factory surface
 export type { SqlDriver, DriverTransaction } from './driver/SqlDriver';
