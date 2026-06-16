@@ -60,9 +60,33 @@ Inventory (Phase 1): 6 tables — `books`, `users`, `orders`, `order_items`, `ca
 `marketplace_listings→users,books`; UNIQUE on `books.isbn`, `users.username`, `users.email`; NUMERIC(10,2)
 money columns; TIMESTAMPTZ timestamps.
 
-Pre-existing coverage (`use-cases.ts`, `lookups.ts`, `builder-cases.ts`) already satisfies Phases 3–4
-and 6 well for the 0.1.0 surface. The dogfooding pass (`db-coverage.ts`, `runDbCoverage`) closes the
-named gaps: **Phase 7** (the 0.1.1 API surface, previously absent cross-engine) and **Phase 5**
-(constraint-violation and transaction-integrity adversarial cases). Remaining exhaustive depth —
-full per-table CRUD for the under-covered tables and a complete type-fidelity sweep — is the
-documented next pass.
+### Audit (Phase 2 + Phase 8), run 2026-06-16
+
+Running the matrix against the pre-existing harness (`use-cases.ts`, `lookups.ts`, `builder-cases.ts`)
+revealed it covered **~45% of the required cells** — exhaustive for the 0.1.0 *read/builder* surface,
+but with real holes: 3 of 6 tables (`users`, `order_items`, `marketplace_listings`) had **no CRUD**,
+FK-violation coverage was 1/7, UNIQUE 1/3, NOT-NULL 1/24, and `ping`/`runScript` were never asserted
+live. (Lesson: "looks well covered" is not coverage — the matrix is.)
+
+### The dogfooding pass (`db-coverage.ts`, `runDbCoverage`)
+
+`runDbCoverage` now closes those holes across all five engines (DC-1 … DC-21):
+
+- **Phase 7 — API surface:** the full 0.1.1 surface — `whereIn`/`whereNull`/`whereNotNull`,
+  `count`/`exists`, `fetch`/`one`/`maybeOne`/`scalar`, the `sql` tag, plus live `ping()` and `runScript()`.
+- **Phase 3 — CRUD:** full INSERT→SELECT-back→UPDATE→DELETE lifecycles for `users`, `order_items`, and
+  `marketplace_listings` (the three tables the harness never mutated).
+- **Phase 4 — aggregates:** `SUM(price_at_purchase)` and `AVG(price)` verified against seed totals.
+- **Phase 5 — constraints:** UNIQUE (`isbn`, `username`, `email`), all FK edges, and a representative
+  NOT-NULL per table all expect `QueryFailedException`; transaction ROLLBACK leaves no trace.
+- **Phase 6 — type fidelity:** timestamp round-trip asserted via *ordering* (tz-immune — the column type
+  is TIMESTAMPTZ / DATETIME / TEXT / DATETIMEOFFSET / TIMESTAMP WITH TIME ZONE depending on engine).
+
+Two engine-specific defaults this pass had to respect (and that the workflow warns about): **SQLite does
+not enforce foreign keys** by default (FK-violation cases are guarded off there), and **SQL Server treats
+two NULLs in a UNIQUE column as duplicates** (only the single `whereNull` probe uses a NULL `isbn`; every
+other temp `books` row carries a distinct non-null isbn). Both were caught by the live matrix, not in review.
+
+Judgment calls on depth: NOT-NULL rejection is a single uniform code path, so it is covered
+**one representative column per table** rather than all 24; FK and UNIQUE are covered per edge/constraint.
+Full per-column NOT-NULL and a per-column type-fidelity sweep remain available as a further pass if desired.
