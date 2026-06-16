@@ -21,7 +21,13 @@ import { rows } from '../../src/result/ResultSet';
 
 export interface ColumnInfo { name: string; nullable: boolean; }
 export interface ForeignKey { column: string; refTable: string; refColumn: string; }
-export interface TableInfo { name: string; columns: ColumnInfo[]; uniqueColumns: string[]; foreignKeys: ForeignKey[]; }
+export interface TableInfo {
+    name: string;
+    columns: ColumnInfo[];
+    primaryKey: string[];      // PK columns — exercised via CRUD, not dup-tested
+    uniqueColumns: string[];   // single-column UNIQUE constraints (PK excluded)
+    foreignKeys: ForeignKey[];
+}
 export interface SchemaInventory { tables: TableInfo[]; }
 
 const lc = (v: unknown): string => String(v).toLowerCase();
@@ -51,13 +57,13 @@ async function introspectSqlite(client: SqlClient): Promise<SchemaInventory> {
         const pkCols = cols.filter((r) => Number(r.get('pk')) > 0).map((r) => lc(r.get('name')));
         const fks = rows(await client.query(`PRAGMA foreign_key_list('${name}')`)).all()
             .map((r) => ({ column: lc(r.get('from')), refTable: lc(r.get('table')), refColumn: lc(r.get('to')) }));
-        const uniqueColumns = new Set<string>(pkCols);
+        const uniqueColumns = new Set<string>();
         for (const idx of rows(await client.query(`PRAGMA index_list('${name}')`)).all()) {
             if (Number(idx.get('unique')) !== 1) continue;
             const idxCols = rows(await client.query(`PRAGMA index_info('${idx.get('name')}')`)).column('name').map(lc);
-            if (idxCols.length === 1) uniqueColumns.add(idxCols[0]);
+            if (idxCols.length === 1 && !pkCols.includes(idxCols[0])) uniqueColumns.add(idxCols[0]);
         }
-        tables.push({ name, columns, uniqueColumns: [...uniqueColumns], foreignKeys: fks });
+        tables.push({ name, columns, primaryKey: pkCols, uniqueColumns: [...uniqueColumns], foreignKeys: fks });
     }
     return { tables };
 }
@@ -79,7 +85,8 @@ async function introspectInformationSchema(client: SqlClient, schema: string): P
          JOIN information_schema.key_column_usage kcu2 ON kcu2.constraint_name = rc.unique_constraint_name AND kcu2.constraint_schema = rc.unique_constraint_schema AND kcu2.ordinal_position = kcu1.ordinal_position
          WHERE kcu1.table_schema = ${p(1)}`, [schema])).all();
     const uqRows = rows(await client.query(
-        `SELECT tc.constraint_name AS cn, tc.table_name AS t, kcu.column_name AS c
+        `SELECT tc.constraint_name AS cn, tc.table_name AS t, kcu.column_name AS c,
+                CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN 'P' ELSE 'U' END AS kind
          FROM information_schema.table_constraints tc
          JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
          WHERE tc.constraint_type IN ('UNIQUE','PRIMARY KEY') AND tc.table_schema = ${p(1)}`, [schema])).all();
@@ -97,7 +104,8 @@ async function introspectMysql(client: SqlClient): Promise<SchemaInventory> {
          FROM information_schema.key_column_usage
          WHERE table_schema = DATABASE() AND referenced_table_name IS NOT NULL`)).all();
     const uqRows = rows(await client.query(
-        `SELECT index_name AS cn, table_name AS t, column_name AS c
+        `SELECT index_name AS cn, table_name AS t, column_name AS c,
+                CASE WHEN index_name = 'PRIMARY' THEN 'P' ELSE 'U' END AS kind
          FROM information_schema.statistics WHERE table_schema = DATABASE() AND non_unique = 0`)).all();
     return assembleInventory(tableNames, colRows, fkRows, uqRows);
 }
@@ -115,7 +123,7 @@ async function introspectOracle(client: SqlClient): Promise<SchemaInventory> {
          JOIN user_cons_columns racc ON rac.constraint_name = racc.constraint_name AND acc.position = racc.position
          WHERE ac.constraint_type = 'R'`)).all();
     const uqRows = rows(await client.query(
-        `SELECT ac.constraint_name AS cn, ac.table_name AS t, acc.column_name AS c
+        `SELECT ac.constraint_name AS cn, ac.table_name AS t, acc.column_name AS c, ac.constraint_type AS kind
          FROM user_constraints ac
          JOIN user_cons_columns acc ON ac.constraint_name = acc.constraint_name
          WHERE ac.constraint_type IN ('U','P')`)).all();
@@ -129,18 +137,21 @@ function assembleInventory(
     fkRows: Array<{ get(k: string): unknown }>,
     uqRows: Array<{ get(k: string): unknown }>,
 ): SchemaInventory {
-    // single-column UNIQUE/PK constraints only (the matrix tests single-column uniqueness)
-    const byConstraint = new Map<string, { table: string; cols: string[] }>();
+    // Group constraint columns; single-column constraints feed the matrix. PK ('P')
+    // and UNIQUE ('U') are tracked separately — PKs are exercised via CRUD, not dup-tested.
+    const byConstraint = new Map<string, { table: string; kind: string; cols: string[] }>();
     for (const r of uqRows) {
         const key = `${lc(r.get('t'))}.${lc(r.get('cn'))}`;
-        const entry = byConstraint.get(key) ?? { table: lc(r.get('t')), cols: [] };
+        const entry = byConstraint.get(key) ?? { table: lc(r.get('t')), kind: String(r.get('kind')), cols: [] };
         entry.cols.push(lc(r.get('c')));
         byConstraint.set(key, entry);
     }
+    const pkByTable = new Map<string, Set<string>>();
     const uniqueByTable = new Map<string, Set<string>>();
-    for (const { table, cols } of byConstraint.values()) {
+    for (const { table, kind, cols } of byConstraint.values()) {
         if (cols.length !== 1) continue;
-        (uniqueByTable.get(table) ?? uniqueByTable.set(table, new Set()).get(table)!).add(cols[0]);
+        const target = kind === 'P' ? pkByTable : uniqueByTable;
+        (target.get(table) ?? target.set(table, new Set()).get(table)!).add(cols[0]);
     }
     const fkByTable = new Map<string, ForeignKey[]>();
     for (const r of fkRows) {
@@ -156,6 +167,7 @@ function assembleInventory(
         tables: tableNames.map((name) => ({
             name,
             columns: colsByTable.get(name) ?? [],
+            primaryKey: [...(pkByTable.get(name) ?? [])],
             uniqueColumns: [...(uniqueByTable.get(name) ?? [])],
             foreignKeys: fkByTable.get(name) ?? [],
         })),
@@ -245,15 +257,91 @@ export async function runSchemaMap(client: SqlClient): Promise<void> {
     for (const col of ['author', 'genre', 'price', 'stock', 'title']) {
         assert.ok(booksNotNull.includes(col), `SM-4: books.${col} should be NOT NULL (got ${booksNotNull.join(', ')})`);
     }
-    // book_id is the PK → must surface as a unique column on every engine.
-    assert.ok(inv.tables.find((t) => t.name === 'books')!.uniqueColumns.includes('book_id'), `SM-4: books.book_id (PK) should be a unique column`);
+    // book_id is the PK → tracked separately from UNIQUE constraints on every engine.
+    assert.ok(inv.tables.find((t) => t.name === 'books')!.primaryKey.includes('book_id'), `SM-4: books.book_id should be the primary key`);
 
     // SM-5: the derived matrix has the expected denominators.
     const m = deriveCoverageMatrix(inv);
     assert.equal(m.crud.length, 6, `SM-5: CRUD denominator should be 6 tables`);
     assert.equal(m.fkViolations.length, 7, `SM-5: FK denominator should be 7 edges`);
-    assert.ok(m.uniques.length >= 3, `SM-5: UNIQUE denominator should be >= 3`);
+    assert.equal(m.uniques.length, 3, `SM-5: UNIQUE denominator should be 3 (isbn, username, email; PKs excluded)`);
     assert.ok(m.notNull.length >= 20, `SM-5: NOT NULL denominator should be >= 20 columns (got ${m.notNull.length})`);
 
     if (process.env.DB_COVERAGE_REPORT) console.log('\n' + formatMatrixReport(client.engine, m) + '\n');
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 — coverage ledger + report (numerator vs the matrix denominator)
+// ---------------------------------------------------------------------------
+
+export type MatrixCategory = keyof CoverageMatrix;
+
+/**
+ * Records which matrix cells the running test suite actually exercises. Coverage
+ * is claimed only by calling `cover()` from a test that ran — so the numerator is
+ * tied to execution, and a removed test drops its claim automatically.
+ */
+export class CoverageLedger {
+    private readonly covered: Record<MatrixCategory, Set<string>> = {
+        crud: new Set(), fkJoins: new Set(), fkViolations: new Set(), uniques: new Set(), notNull: new Set(),
+    };
+    cover(category: MatrixCategory, cell: string): void { this.covered[category].add(cell); }
+    has(category: MatrixCategory, cell: string): boolean { return this.covered[category].has(cell); }
+}
+
+export interface CategoryCoverage { covered: number; total: number; uncovered: string[]; }
+export type CoverageReport = Record<MatrixCategory, CategoryCoverage>;
+
+/** Cross-reference the ledger (numerator) against the derived matrix (denominator). */
+export function reportCoverage(matrix: CoverageMatrix, ledger: CoverageLedger): CoverageReport {
+    const categories = Object.keys(matrix) as MatrixCategory[];
+    const out = {} as CoverageReport;
+    for (const cat of categories) {
+        const uncovered = matrix[cat].filter((cell) => !ledger.has(cat, cell));
+        out[cat] = { covered: matrix[cat].length - uncovered.length, total: matrix[cat].length, uncovered };
+    }
+    return out;
+}
+
+export function formatCoverageReport(engine: string, report: CoverageReport): string {
+    const line = (name: string, c: CategoryCoverage) =>
+        `- **${name}**: ${c.covered}/${c.total}` + (c.uncovered.length ? ` — uncovered: ${c.uncovered.join(', ')}` : ' ✓');
+    return [
+        `### Coverage report — ${engine}`,
+        line('CRUD round-trips', report.crud),
+        line('FK joins', report.fkJoins),
+        line('FK violations', report.fkViolations),
+        line('UNIQUE rejections', report.uniques),
+        line('NOT NULL rejections', report.notNull),
+    ].join('\n');
+}
+
+/**
+ * Phase 8 — cross-reference a coverage ledger against the live-introspected matrix,
+ * print the report (DB_COVERAGE_REPORT=1), and ENFORCE the gate: 100% on the
+ * categories the matrix-driven suite owns (crud/fkJoins/fkViolations/uniques) and
+ * representative-per-table on NOT NULL (the documented depth policy). A schema
+ * change that adds an uncovered table/FK/constraint fails this gate — the
+ * convergence discipline the doc-only workflow lacked, enforced in CI.
+ */
+export async function runCoverageReport(client: SqlClient, ledger: CoverageLedger): Promise<void> {
+    const matrix = deriveCoverageMatrix(await introspectSchema(client));
+    const report = reportCoverage(matrix, ledger);
+    if (process.env.DB_COVERAGE_REPORT) console.log('\n' + formatCoverageReport(client.engine, report) + '\n');
+
+    // SQLite doesn't enforce FKs by default, so FK-violation cases can't run there —
+    // exempt that one category on SQLite (documented in db-coverage-workflow.md).
+    const gated: MatrixCategory[] = client.engine === 'sqlite'
+        ? ['crud', 'fkJoins', 'uniques']
+        : ['crud', 'fkJoins', 'fkViolations', 'uniques'];
+    for (const cat of gated) {
+        assert.equal(report[cat].covered, report[cat].total,
+            `coverage gate (${client.engine}): ${cat} ${report[cat].covered}/${report[cat].total} — uncovered: ${report[cat].uncovered.join(', ')}`);
+    }
+    // NOT NULL: representative-per-table — every table with NOT NULL columns has >= 1 covered.
+    const tablesWithNotNull = new Set(matrix.notNull.map((c) => c.split('.')[0]));
+    const tablesCovered = new Set(matrix.notNull.filter((c) => ledger.has('notNull', c)).map((c) => c.split('.')[0]));
+    for (const t of tablesWithNotNull) {
+        assert.ok(tablesCovered.has(t), `coverage gate (${client.engine}): NOT NULL has no covered column for table ${t}`);
+    }
 }

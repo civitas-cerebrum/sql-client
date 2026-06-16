@@ -4,7 +4,7 @@ import { SqlClient } from '../../src/client/SqlClient';
 import { runUseCases } from './use-cases';
 import { runLookups } from './lookups';
 import { runBuilderCases } from './builder-cases';
-import { runSchemaMap } from './schema-map';
+import { runSchemaMap, runCoverageReport } from './schema-map';
 import { runDbCoverage } from './db-coverage';
 
 const ORACLE_TEST_URL = process.env.ORACLE_TEST_URL ?? 'oracle://bookhive:bookhive@localhost:1521/FREEPDB1';
@@ -23,7 +23,8 @@ async function main() {
     await runLookups(client);
     await runBuilderCases(client);
     await runSchemaMap(client);
-    await runDbCoverage(client);
+    const __ledger = await runDbCoverage(client);
+    await runCoverageReport(client, __ledger);
     await client.end();
     console.log('integration/oracle.test.ts PASSED');
 }

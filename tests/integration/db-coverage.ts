@@ -23,8 +23,14 @@ import { QueryBuilder } from '../../src/builder/QueryBuilder';
 import { sql } from '../../src/builder/SqlTag';
 import { QueryFailedException } from '../../src/exceptions/SqlException';
 import { rows } from '../../src/result/ResultSet';
+import { CoverageLedger } from './schema-map';
 
-export async function runDbCoverage(client: SqlClient): Promise<void> {
+/**
+ * Runs the matrix-driven coverage suite and returns a populated CoverageLedger.
+ * Coverage is claimed via ledger.cover(...) co-located with each case, so the
+ * numerator the Phase-8 report cross-references is tied to what actually ran.
+ */
+export async function runDbCoverage(client: SqlClient, ledger: CoverageLedger = new CoverageLedger()): Promise<CoverageLedger> {
     const e = client.engine;
 
     // =========================================================================
@@ -112,6 +118,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
                     .values({ book_id: tmp, title: 'Dup', author: 'A', genre: 'Fiction', price: 1.0, stock: 0, isbn: '978-0-06-112008-4' }) // book-001's isbn
                     .run(client),
                 QueryFailedException, `DC-8: duplicate isbn should violate UNIQUE`);
+            ledger.cover('uniques', 'books.isbn');
         } finally {
             await QueryBuilder.delete('books').where('book_id = ?', tmp).run(client).catch(() => {});
         }
@@ -126,6 +133,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
                     .values({ book_id: tmp, title: null, author: 'A', genre: 'Fiction', price: 1.0, stock: 0, isbn: 'dc-isbn-9' })
                     .run(client),
                 QueryFailedException, `DC-9: null title should violate NOT NULL`);
+            ledger.cover('notNull', 'books.title');
         } finally {
             await QueryBuilder.delete('books').where('book_id = ?', tmp).run(client).catch(() => {});
         }
@@ -143,6 +151,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
                     .values({ order_id: tmp, user_id: 'user-does-not-exist', total_price: 1.0, status: 'PENDING', purchased_at: new Date('2026-05-01T00:00:00Z') })
                     .run(client),
                 QueryFailedException, `DC-10: missing user_id should violate FK`);
+            ledger.cover('fkViolations', 'orders.user_id->users.user_id');
         } finally {
             await QueryBuilder.delete('orders').where('order_id = ?', tmp).run(client).catch(() => {});
         }
@@ -184,6 +193,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
             assert.equal((await QueryBuilder.select('users').columns('email').where('user_id = ?', tmp).one(client)).string('email'), 'dc-temp2@bookhive.test', `DC-12: users UPDATE verify`);
             assert.equal((await QueryBuilder.delete('users').where('user_id = ?', tmp).run(client)).rowCount, 1, `DC-12: users DELETE`);
             assert.equal(await QueryBuilder.select('users').where('user_id = ?', tmp).count(client), 0, `DC-12: users DELETE verify`);
+            ledger.cover('crud', 'users');
         } finally {
             await QueryBuilder.delete('users').where('user_id = ?', tmp).run(client).catch(() => {});
         }
@@ -200,6 +210,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
             await QueryBuilder.update('order_items').set({ quantity: 5 }).where('order_item_id = ?', tmp).run(client);
             assert.equal((await QueryBuilder.select('order_items').columns('quantity').where('order_item_id = ?', tmp).one(client)).number('quantity'), 5, `DC-13: order_items UPDATE verify`);
             assert.equal((await QueryBuilder.delete('order_items').where('order_item_id = ?', tmp).run(client)).rowCount, 1, `DC-13: order_items DELETE`);
+            ledger.cover('crud', 'order_items');
         } finally {
             await QueryBuilder.delete('order_items').where('order_item_id = ?', tmp).run(client).catch(() => {});
         }
@@ -220,6 +231,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
             assert.equal(upd.number('price'), 6.66, `DC-14: listings UPDATE verify price`);
             assert.equal(upd.string('status'), 'SOLD', `DC-14: listings UPDATE verify status`);
             assert.equal((await QueryBuilder.delete('marketplace_listings').where('listing_id = ?', tmp).run(client)).rowCount, 1, `DC-14: listings DELETE`);
+            ledger.cover('crud', 'marketplace_listings');
         } finally {
             await QueryBuilder.delete('marketplace_listings').where('listing_id = ?', tmp).run(client).catch(() => {});
         }
@@ -246,6 +258,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
                                 ['email', { user_id: 'dc-u2', username: 'dc-uniq-user', email: 'alice@bookhive.test', password_hash: 'x', created_at: new Date('2026-05-03T00:00:00Z') }]] as const) {
         try {
             await assert.rejects(QueryBuilder.insert('users').values(dup).run(client), QueryFailedException, `DC-16: duplicate ${label} should violate UNIQUE`);
+            ledger.cover('uniques', `users.${label}`);
         } finally {
             await QueryBuilder.delete('users').where('user_id = ?', dup.user_id).run(client).catch(() => {});
         }
@@ -255,17 +268,18 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
     // FKs by default, so the rejection is asserted only where the engine does.
     if (e !== 'sqlite') {
         const fkCases: Array<[string, string, Record<string, unknown>]> = [
-            ['order_items.order_id', 'order_items', { order_item_id: 'dc-fk1', order_id: 'nope', book_id: 'book-001', quantity: 1, price_at_purchase: 1.0 }],
-            ['order_items.book_id', 'order_items', { order_item_id: 'dc-fk2', order_id: 'order-001', book_id: 'nope', quantity: 1, price_at_purchase: 1.0 }],
-            ['cart_items.user_id', 'cart_items', { cart_item_id: 'dc-fk3', user_id: 'nope', book_id: 'book-001', quantity: 1, added_at: new Date('2026-05-04T00:00:00Z') }],
-            ['cart_items.book_id', 'cart_items', { cart_item_id: 'dc-fk4', user_id: 'user-001', book_id: 'nope', quantity: 1, added_at: new Date('2026-05-04T00:00:00Z') }],
-            ['marketplace_listings.seller_id', 'marketplace_listings', { listing_id: 'dc-fk5', seller_id: 'nope', book_id: 'book-001', [condKey]: 'USED_GOOD', price: 1.0, listed_at: new Date('2026-05-04T00:00:00Z'), status: 'ACTIVE' }],
-            ['marketplace_listings.book_id', 'marketplace_listings', { listing_id: 'dc-fk6', seller_id: 'user-001', book_id: 'nope', [condKey]: 'USED_GOOD', price: 1.0, listed_at: new Date('2026-05-04T00:00:00Z'), status: 'ACTIVE' }],
+            ['order_items.order_id->orders.order_id', 'order_items', { order_item_id: 'dc-fk1', order_id: 'nope', book_id: 'book-001', quantity: 1, price_at_purchase: 1.0 }],
+            ['order_items.book_id->books.book_id', 'order_items', { order_item_id: 'dc-fk2', order_id: 'order-001', book_id: 'nope', quantity: 1, price_at_purchase: 1.0 }],
+            ['cart_items.user_id->users.user_id', 'cart_items', { cart_item_id: 'dc-fk3', user_id: 'nope', book_id: 'book-001', quantity: 1, added_at: new Date('2026-05-04T00:00:00Z') }],
+            ['cart_items.book_id->books.book_id', 'cart_items', { cart_item_id: 'dc-fk4', user_id: 'user-001', book_id: 'nope', quantity: 1, added_at: new Date('2026-05-04T00:00:00Z') }],
+            ['marketplace_listings.seller_id->users.user_id', 'marketplace_listings', { listing_id: 'dc-fk5', seller_id: 'nope', book_id: 'book-001', [condKey]: 'USED_GOOD', price: 1.0, listed_at: new Date('2026-05-04T00:00:00Z'), status: 'ACTIVE' }],
+            ['marketplace_listings.book_id->books.book_id', 'marketplace_listings', { listing_id: 'dc-fk6', seller_id: 'user-001', book_id: 'nope', [condKey]: 'USED_GOOD', price: 1.0, listed_at: new Date('2026-05-04T00:00:00Z'), status: 'ACTIVE' }],
         ];
-        for (const [label, table, row] of fkCases) {
+        for (const [edge, table, row] of fkCases) {
             const idCol = Object.keys(row)[0];
             try {
-                await assert.rejects(QueryBuilder.insert(table).values(row).run(client), QueryFailedException, `DC-17: ${label} should violate FK`);
+                await assert.rejects(QueryBuilder.insert(table).values(row).run(client), QueryFailedException, `DC-17: ${edge} should violate FK`);
+                ledger.cover('fkViolations', edge);
             } finally {
                 await QueryBuilder.delete(table).where(`${idCol} = ?`, row[idCol]).run(client).catch(() => {});
             }
@@ -286,6 +300,7 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
         const idCol = Object.keys(row)[0];
         try {
             await assert.rejects(QueryBuilder.insert(table).values(row).run(client), QueryFailedException, `DC-18: null ${label} should violate NOT NULL`);
+            ledger.cover('notNull', label);
         } finally {
             await QueryBuilder.delete(table).where(`${idCol} = ?`, row[idCol]).run(client).catch(() => {});
         }
@@ -333,4 +348,74 @@ export async function runDbCoverage(client: SqlClient): Promise<void> {
             await QueryBuilder.delete('books').whereIn('book_id', ['dc-rs-1', 'dc-rs-2']).run(client).catch(() => {});
         }
     }
+
+    // =========================================================================
+    // PHASE 4 (cont.) — every FK edge traversed by a JOIN (referential integrity)
+    // =========================================================================
+
+    // DC-22: each FK relationship links seed rows across the join. Identifiers are
+    // unquoted lowercase (Oracle folds to its UPPERCASE schema; join keys are not
+    // reserved words on any engine).
+    {
+        const joins: Array<[string, string]> = [
+            ['orders.user_id->users.user_id', 'SELECT COUNT(*) AS n FROM orders c JOIN users p ON c.user_id = p.user_id'],
+            ['order_items.order_id->orders.order_id', 'SELECT COUNT(*) AS n FROM order_items c JOIN orders p ON c.order_id = p.order_id'],
+            ['order_items.book_id->books.book_id', 'SELECT COUNT(*) AS n FROM order_items c JOIN books p ON c.book_id = p.book_id'],
+            ['cart_items.user_id->users.user_id', 'SELECT COUNT(*) AS n FROM cart_items c JOIN users p ON c.user_id = p.user_id'],
+            ['cart_items.book_id->books.book_id', 'SELECT COUNT(*) AS n FROM cart_items c JOIN books p ON c.book_id = p.book_id'],
+            ['marketplace_listings.seller_id->users.user_id', 'SELECT COUNT(*) AS n FROM marketplace_listings c JOIN users p ON c.seller_id = p.user_id'],
+            ['marketplace_listings.book_id->books.book_id', 'SELECT COUNT(*) AS n FROM marketplace_listings c JOIN books p ON c.book_id = p.book_id'],
+        ];
+        for (const [edge, joinSql] of joins) {
+            const n = rows(await client.query(joinSql)).one().number('n')!;
+            assert.ok(n > 0, `DC-22: ${edge} join should link >= 1 seed row (got ${n})`);
+            ledger.cover('fkJoins', edge);
+        }
+    }
+
+    // =========================================================================
+    // PHASE 3 (cont.) — CRUD for the remaining seeded tables so the matrix-driven
+    // suite owns all six (users/order_items/marketplace_listings done in DC-12-14).
+    // =========================================================================
+
+    // DC-23: books / cart_items / orders lifecycles (insert → read-back → update → delete).
+    {
+        const bk = 'dc-crud-book';
+        await QueryBuilder.insert('books').values({ book_id: bk, title: 'CRUD Book', author: 'A', genre: 'Fiction', price: 3.33, stock: 1, isbn: 'dc-isbn-crud' }).run(client);
+        try {
+            assert.equal((await QueryBuilder.select('books').columns('title').where('book_id = ?', bk).one(client)).string('title'), 'CRUD Book', `DC-23 books: read-back`);
+            await QueryBuilder.update('books').set({ stock: 9 }).where('book_id = ?', bk).run(client);
+            assert.equal((await QueryBuilder.select('books').columns('stock').where('book_id = ?', bk).one(client)).number('stock'), 9, `DC-23 books: update`);
+            assert.equal((await QueryBuilder.delete('books').where('book_id = ?', bk).run(client)).rowCount, 1, `DC-23 books: delete`);
+            ledger.cover('crud', 'books');
+        } finally {
+            await QueryBuilder.delete('books').where('book_id = ?', bk).run(client).catch(() => {});
+        }
+
+        const ci = 'dc-crud-cart';
+        await QueryBuilder.insert('cart_items').values({ cart_item_id: ci, user_id: 'user-001', book_id: 'book-001', quantity: 2, added_at: new Date('2026-05-06T00:00:00Z') }).run(client);
+        try {
+            assert.equal((await QueryBuilder.select('cart_items').columns('quantity').where('cart_item_id = ?', ci).one(client)).number('quantity'), 2, `DC-23 cart_items: read-back`);
+            await QueryBuilder.update('cart_items').set({ quantity: 4 }).where('cart_item_id = ?', ci).run(client);
+            assert.equal((await QueryBuilder.select('cart_items').columns('quantity').where('cart_item_id = ?', ci).one(client)).number('quantity'), 4, `DC-23 cart_items: update`);
+            assert.equal((await QueryBuilder.delete('cart_items').where('cart_item_id = ?', ci).run(client)).rowCount, 1, `DC-23 cart_items: delete`);
+            ledger.cover('crud', 'cart_items');
+        } finally {
+            await QueryBuilder.delete('cart_items').where('cart_item_id = ?', ci).run(client).catch(() => {});
+        }
+
+        const od = 'dc-crud-order';
+        await QueryBuilder.insert('orders').values({ order_id: od, user_id: 'user-001', total_price: 5.55, status: 'PENDING', purchased_at: new Date('2026-05-06T00:00:00Z') }).run(client);
+        try {
+            assert.equal((await QueryBuilder.select('orders').columns('status').where('order_id = ?', od).one(client)).string('status'), 'PENDING', `DC-23 orders: read-back`);
+            await QueryBuilder.update('orders').set({ status: 'COMPLETED' }).where('order_id = ?', od).run(client);
+            assert.equal((await QueryBuilder.select('orders').columns('status').where('order_id = ?', od).one(client)).string('status'), 'COMPLETED', `DC-23 orders: update`);
+            assert.equal((await QueryBuilder.delete('orders').where('order_id = ?', od).run(client)).rowCount, 1, `DC-23 orders: delete`);
+            ledger.cover('crud', 'orders');
+        } finally {
+            await QueryBuilder.delete('orders').where('order_id = ?', od).run(client).catch(() => {});
+        }
+    }
+
+    return ledger;
 }

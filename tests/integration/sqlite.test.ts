@@ -3,7 +3,7 @@ import { SqlClient } from '../../src/client/SqlClient';
 import { runUseCases } from './use-cases';
 import { runLookups } from './lookups';
 import { runBuilderCases } from './builder-cases';
-import { runSchemaMap } from './schema-map';
+import { runSchemaMap, runCoverageReport } from './schema-map';
 import { runDbCoverage } from './db-coverage';
 
 async function main() {
@@ -18,7 +18,8 @@ async function main() {
     await runLookups(db);
     await runBuilderCases(db);
     await runSchemaMap(db);
-    await runDbCoverage(db);
+    const __ledger = await runDbCoverage(db);
+    await runCoverageReport(db, __ledger);
     await db.end();
     console.log('integration/sqlite.test.ts PASSED');
 }
