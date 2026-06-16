@@ -13,4 +13,16 @@ assert.equal(detectEngine('sqlserver://u:p@h/db'), 'mssql');
 assert.equal(detectEngine('oracle://u:p@h:1521/svc'), 'oracle');
 assert.equal(detectEngine('oracledb://u:p@h/svc'), 'oracle');
 assert.throws(() => detectEngine('mongodb://h/db'), /Unable to detect SQL engine/);
+
+// The error must redact userinfo passwords and list the recognized schemes.
+assert.throws(() => detectEngine('mongodb://alice:s3cret@h/db'), (e: unknown) => {
+    const msg = (e as Error).message;
+    assert.ok(!msg.includes('s3cret'), `error must not echo the password: ${msg}`);
+    assert.ok(msg.includes('***'), `error must redact the password as ***: ${msg}`);
+    assert.ok(msg.includes('alice'), `error keeps the username: ${msg}`);
+    for (const scheme of ['postgres://', 'mysql://', 'sqlite:', 'mssql://', 'oracle://']) {
+        assert.ok(msg.includes(scheme), `error must list recognized scheme ${scheme}: ${msg}`);
+    }
+    return true;
+});
 console.log('engine-detection.test.ts PASSED');

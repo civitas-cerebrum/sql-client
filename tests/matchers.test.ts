@@ -4,12 +4,20 @@ import {
     startsWith, endsWith, matches, isNull, notNull, not,
 } from '../src/result/matchers';
 
-// equality (loose String compare — pg decimals are strings)
+// equality (numeric-aware loose compare — pg decimals are strings)
 assert.equal(eq('12.99')(12.99), true);
 assert.equal(eq('Fiction')('Fiction'), true);
 assert.equal(eq('Fiction')('Fantasy'), false);
 assert.equal(ne('Fiction')('Fantasy'), true);
 assert.equal(ne('Fiction')('Fiction'), false);
+assert.equal(eq(6.5)('6.50'), true);            // engine numeric formatting
+assert.equal(eq('6.50')(6.5), true);
+assert.equal(eq('abc')('abc'), true);           // string behavior unchanged
+assert.equal(eq('abc')('abd'), false);
+assert.equal(eq(6.5)(null), false);             // null cells only match isNull()
+assert.equal(eq(6.5)(undefined), false);
+assert.equal(ne(6.5)('6.50'), false);
+assert.equal(ne(6.5)('6.51'), true);
 
 // numeric comparison (Number coercion; null/NaN → false)
 assert.equal(lt(10)('8.99'), true);
@@ -24,9 +32,11 @@ assert.equal(between(10, 15)('12.99'), true);
 assert.equal(between(10, 15)('18.99'), false);
 assert.equal(between(15, 10)(12), false);       // min>max → matches nothing
 
-// membership
+// membership (numeric-aware)
 assert.equal(oneOf(['ACTIVE', 'SOLD'])('SOLD'), true);
 assert.equal(oneOf(['ACTIVE', 'SOLD'])('PENDING'), false);
+assert.equal(oneOf([6.5])('6.50'), true);
+assert.equal(oneOf([6.5, 9])(null), false);
 
 // string matchers (case-insensitive; null → false)
 assert.equal(like('%1984%')('Nineteen 1984 Edition'), true);

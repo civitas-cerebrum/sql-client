@@ -1,4 +1,6 @@
 import { SqlResult } from '../models/SqlResult';
+import { ResultError } from '../exceptions/SqlException';
+import { looseEquals } from './matchers';
 
 /** Sentinel meaning "column key not found on the row". */
 const ABSENT = Symbol('absent');
@@ -37,7 +39,7 @@ const FALSE_STRINGS = new Set(['0', 'false', 'f', 'n', 'no']);
 /**
  * Boolean coercion normalizing engine representations.
  * null/undefined pass through. boolean → as-is. number → v !== 0.
- * string (case-insensitive): true/false sets above; any other non-empty string → RangeError.
+ * string (case-insensitive): true/false sets above; any other non-empty string → ResultError.
  */
 export function getBoolean(row: Record<string, unknown>, column: string): boolean | null | undefined {
     const v = getValue(row, column);
@@ -47,7 +49,7 @@ export function getBoolean(row: Record<string, unknown>, column: string): boolea
     const s = String(v).toLowerCase();
     if (TRUE_STRINGS.has(s)) return true;
     if (FALSE_STRINGS.has(s)) return false;
-    throw new RangeError(`getBoolean: cannot coerce "${v}" in column "${column}" to a boolean.`);
+    throw new ResultError(`getBoolean: cannot coerce "${v}" in column "${column}" to a boolean.`);
 }
 
 /** Values of `column` across every row (via getValue). */
@@ -62,7 +64,7 @@ export type RowPredicate = (row: Record<string, unknown>) => boolean;
 function matchesPartial(row: Record<string, unknown>, partial: Record<string, unknown>): boolean {
     return Object.entries(partial).every(([k, v]) => {
         const actual = getValue(row, k);
-        return typeof v === 'function' ? (v as (value: unknown) => boolean)(actual) : String(actual) === String(v);
+        return typeof v === 'function' ? (v as (value: unknown) => boolean)(actual) : looseEquals(actual, v);
     });
 }
 
@@ -72,19 +74,21 @@ function toPredicate(where: Record<string, unknown> | RowPredicate): RowPredicat
 }
 
 /** First row matching `where` (matcher-aware partial or a raw-row predicate). */
-export function findRow<T extends Record<string, unknown>>(rows: T[], where: Record<string, unknown> | RowPredicate): T | undefined {
-    return rows.find(toPredicate(where));
+export function findRow<T extends object>(rows: T[], where: Record<string, unknown> | RowPredicate): T | undefined {
+    const pred = toPredicate(where);
+    return rows.find((r) => pred(r as Record<string, unknown>));
 }
 
 /** All rows matching `where` (matcher-aware partial or a raw-row predicate). */
-export function filterRows<T extends Record<string, unknown>>(rows: T[], where: Record<string, unknown> | RowPredicate): T[] {
-    return rows.filter(toPredicate(where));
+export function filterRows<T extends object>(rows: T[], where: Record<string, unknown> | RowPredicate): T[] {
+    const pred = toPredicate(where);
+    return rows.filter((r) => pred(r as Record<string, unknown>));
 }
 
 /** Value of the first row's `column` (named, or the first field when omitted). undefined if no rows. */
-export function getScalar(result: SqlResult<Record<string, unknown>>, column?: string): unknown {
+export function getScalar<T extends object>(result: SqlResult<T>, column?: string): unknown {
     const row = result.rows[0];
     if (!row) return undefined;
     const name = column ?? result.fields[0]?.name ?? Object.keys(row)[0];
-    return name === undefined ? undefined : getValue(row, name);
+    return name === undefined ? undefined : getValue(row as Record<string, unknown>, name);
 }

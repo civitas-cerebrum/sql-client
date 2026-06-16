@@ -9,13 +9,26 @@ function n(v: unknown): number {
     return Number(v);
 }
 
-/** Loose-equality (String compare). */
+/**
+ * Loose equality across engine value representations: when both sides are
+ * non-nullish and numeric ("6.50" vs 6.5) compare as numbers, else as strings.
+ */
+export function looseEquals(a: unknown, b: unknown): boolean {
+    if (!isNullish(a) && !isNullish(b)) {
+        const na = Number(a);
+        const nb = Number(b);
+        if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+    }
+    return String(a) === String(b);
+}
+
+/** Loose-equality (numeric-aware String compare). */
 export function eq(expected: unknown): Matcher {
-    return (value) => String(value) === String(expected);
+    return (value) => looseEquals(value, expected);
 }
 /** Loose-inequality. */
 export function ne(expected: unknown): Matcher {
-    return (value) => String(value) !== String(expected);
+    return (value) => !looseEquals(value, expected);
 }
 
 export function lt(bound: number): Matcher { return (v) => { const x = n(v); return !Number.isNaN(x) && x < bound; }; }
@@ -28,8 +41,7 @@ export function between(min: number, max: number): Matcher {
 }
 
 export function oneOf(values: unknown[]): Matcher {
-    const set = values.map((x) => String(x));
-    return (value) => set.includes(String(value));
+    return (value) => values.some((x) => looseEquals(value, x));
 }
 
 /** Escape RegExp metacharacters EXCEPT we handle % and _ ourselves. */

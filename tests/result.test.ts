@@ -31,7 +31,7 @@ assert.equal(getBoolean({ x: 'false' }, 'x'), false);
 assert.equal(getBoolean({ x: true }, 'x'), true);
 assert.equal(getBoolean(row, 'missingNull'), null);
 assert.equal(getBoolean(row, 'nope'), undefined);
-assert.throws(() => getBoolean({ x: 'maybe' }, 'x'), RangeError);
+assert.throws(() => getBoolean({ x: 'maybe' }, 'x'), ResultError); // coercion failure → ResultError
 
 console.log('result.test.ts core PASSED');
 
@@ -55,6 +55,15 @@ assert.equal(findRow(books, { genre: 'Horror' }), undefined);
 assert.equal(filterRows(books, { genre: 'Fiction' }).length, 1);
 assert.equal(filterRows(books, { genre: 'Nope' }).length, 0);
 
+// numeric-aware partial equality ("6.50" matches 6.5; null cells don't match numbers)
+const listings = [
+    { listing_id: 'l-1', price: '6.50' },
+    { listing_id: 'l-2', price: null },
+];
+assert.equal(findRow(listings, { price: 6.5 })?.listing_id, 'l-1');
+assert.equal(filterRows(listings, { price: 6.5 }).length, 1);
+assert.equal(findRow(listings, { price: 'abc' }), undefined);   // string compare unchanged
+
 // getScalar — named column from first row, then field-based default
 const result = { rows: [{ n: '8' }], rowCount: 1, fields: [{ name: 'n', dataTypeID: 0 }] };
 assert.equal(getScalar(result, 'n'), '8');
@@ -63,8 +72,10 @@ assert.equal(getScalar({ rows: [], rowCount: 0, fields: [] }), undefined); // em
 
 console.log('result.test.ts collections PASSED');
 
-import { rows, ResultSet, Row } from '../src/result/ResultSet';
+import { rows, ResultSet, Row, ColumnOf } from '../src/result/ResultSet';
+import { isNull } from '../src/result/matchers';
 import { ResultError } from '../src/exceptions/SqlException';
+import { SqlResult } from '../src/models/SqlResult';
 
 const oneResult = { rows: [{ title: '1984', price: '11.99', active: 1 }], rowCount: 1, fields: [{ name: 'title', dataTypeID: 0 }] };
 const manyResult = { rows: books, rowCount: 3, fields: [{ name: 'book_id', dataTypeID: 0 }] };
@@ -117,4 +128,45 @@ assert.equal(rows(manyResult).all().length, 3);
 assert.ok(rows(manyResult).all()[0] instanceof Row);
 assert.deepEqual(rows(manyResult).raw(), books);
 
+// where() returns a chainable ResultSet over the matched raw rows
+const fiction = rows(manyResult).where({ genre: 'Fiction' });
+assert.ok(fiction instanceof ResultSet);
+assert.equal(fiction.one().get('book_id'), 'book-001');
+assert.deepEqual(fiction.column('book_id'), ['book-001']);
+assert.deepEqual(fiction.raw(), [books[0]]);
+assert.equal(rows(manyResult).where({ genre: 'Horror' }).isEmpty(), true);
+assert.equal(rows(manyResult).where((row) => Number(row.number('price')) > 13).length, 2);
+assert.equal(rows(manyResult).where({ genre: 'Fantasy' }).where({ price: '14.99' }).one().get('book_id'), 'book-008');
+
+// for-of iteration yields Row wrappers
+const iterated: unknown[] = [];
+for (const row of rows(manyResult)) {
+    assert.ok(row instanceof Row);
+    iterated.push(row.get('book_id'));
+}
+assert.deepEqual(iterated, ['book-001', 'book-006', 'book-008']);
+assert.deepEqual([...rows(emptyResult)], []);
+
+// numeric-aware find through the wrapper ("6.50" matches 6.5; null only matches isNull())
+const listingResult = { rows: listings, rowCount: 2, fields: [{ name: 'listing_id', dataTypeID: 0 }] };
+assert.equal(rows(listingResult).find({ price: 6.5 })?.get('listing_id'), 'l-1');
+assert.equal(rows(listingResult).where({ price: 6.5 }).length, 1);
+assert.equal(rows(listingResult).find({ price: isNull() })?.get('listing_id'), 'l-2');
+
 console.log('result.test.ts wrapper PASSED');
+
+// --- type-level: plain interfaces (no index signature) must satisfy T extends object ---
+interface PlainUser { id: number; name: string }
+const plainResult: SqlResult<PlainUser> = { rows: [{ id: 1, name: 'alice' }], rowCount: 1, fields: [{ name: 'id', dataTypeID: 0 }] };
+const plainUser = rows(plainResult).one();             // Row<PlainUser>
+assert.equal(plainUser.number('id'), 1);               // ColumnOf<PlainUser> autocomplete
+assert.equal(plainUser.string('name'), 'alice');
+assert.equal(plainUser.string('NAME_FROM_ORACLE'), undefined); // (string & {}) fallback still compiles
+assert.equal(findRow(plainResult.rows, { name: 'alice' })?.id, 1);
+assert.equal(filterRows(plainResult.rows, { id: 1 }).length, 1);
+assert.equal(getScalar(plainResult), 1);
+assert.equal(rows(plainResult).where({ id: 1 }).one().get('name'), 'alice');
+const colCheck: ColumnOf<PlainUser> = 'name';
+assert.equal(colCheck, 'name');
+
+console.log('result.test.ts typed PASSED');
