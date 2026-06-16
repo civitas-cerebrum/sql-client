@@ -45,7 +45,7 @@
     "@types/debug": "^4.1.13",
     "@types/mssql": "^12.3.0",
     "@types/node": "^20.0.0",
-    "@types/oracledb": "^6.10.4",
+    "@types/oracledb": "^7.0.1",
     "@types/pg": "^8.11.0",
     "better-sqlite3": "^12.10.0",
     "mssql": "^12.5.5",
