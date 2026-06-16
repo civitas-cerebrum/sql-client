@@ -4,6 +4,7 @@ import { SqlClient } from '../../src/client/SqlClient';
 import { runUseCases } from './use-cases';
 import { runLookups } from './lookups';
 import { runBuilderCases } from './builder-cases';
+import { runDbCoverage } from './db-coverage';
 
 const BASE_CONFIG = {
     engine: 'mssql' as const,
@@ -36,6 +37,7 @@ async function main() {
     await runUseCases(client);
     await runLookups(client);
     await runBuilderCases(client);
+    await runDbCoverage(client);
     await client.end();
     console.log('integration/mssql.test.ts PASSED');
 }
