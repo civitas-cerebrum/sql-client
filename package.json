@@ -33,7 +33,8 @@
   "files": [
     "dist",
     "skills",
-    "scripts/postinstall.js"
+    "scripts/postinstall.js",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "debug": "^4.4.3"
