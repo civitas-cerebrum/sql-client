@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: 🗂️  Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Guard against accidental/experiment tags: the tag (optionally v-prefixed)
       # must match package.json's version or we refuse to publish.
