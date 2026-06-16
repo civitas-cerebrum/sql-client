@@ -202,7 +202,7 @@ import { rows } from '@civitas-cerebrum/sql-client';
 const rs = rows(await client.query('SELECT * FROM books'));   // also accepts a raw rows array
 ```
 
-`ResultSet<T>`: `length`, `rowCount`, `isEmpty()`, `at(i)`, `first()`, `one()` (exactly 1 row or `ResultError`), `maybeOne()` (0..1 or `ResultError`), `scalar(column?)` (first cell of first row), `column(name)`, `find(partial | predicate)` → `Row | undefined`, `where(partial | predicate)` → **chainable `ResultSet`** (so `rows(res).where({genre:'Fiction'}).one()` / `.column('title')` / `.isEmpty()` compose), `map(fn)`, `all()`, `raw()`. `ResultSet` is also `for…of`-iterable (yields `Row`).
+`ResultSet<T>`: `length`, `rowCount`, `isEmpty()`, `at(i)`, `first()`, `one()` (exactly 1 row or `ResultError`), `maybeOne()` (0..1 or `ResultError`), `scalar(column?)` (first cell of first row), `column(name)`, `find(partial | predicate)` → `Row | undefined`, `where(partial | predicate)` → **chainable `ResultSet`** (so `rows(res).where({genre:'Fiction'}).one()` / `.column('title')` / `.isEmpty()` compose), `map(fn)`, `all()` (→ `Row[]`), `raw()`.
 
 `Row<T>`: `get(col)`, `string(col)`, `number(col)`, `boolean(col)` (normalizes `1/0`, `'t'/'f'`, `'true'/'false'`), `has(col)`, `raw()`. All case-insensitive. With a row type `T` (e.g. `client.query<Book>(...)`), column names autocomplete while arbitrary strings remain legal for Oracle UPPERCASE access.
 

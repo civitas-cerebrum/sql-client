@@ -138,14 +138,11 @@ assert.equal(rows(manyResult).where({ genre: 'Horror' }).isEmpty(), true);
 assert.equal(rows(manyResult).where((row) => Number(row.number('price')) > 13).length, 2);
 assert.equal(rows(manyResult).where({ genre: 'Fantasy' }).where({ price: '14.99' }).one().get('book_id'), 'book-008');
 
-// for-of iteration yields Row wrappers
-const iterated: unknown[] = [];
-for (const row of rows(manyResult)) {
-    assert.ok(row instanceof Row);
-    iterated.push(row.get('book_id'));
-}
-assert.deepEqual(iterated, ['book-001', 'book-006', 'book-008']);
-assert.deepEqual([...rows(emptyResult)], []);
+// all() yields Row wrappers for every row
+const allRows = rows(manyResult).all();
+assert.ok(allRows.every((row) => row instanceof Row));
+assert.deepEqual(allRows.map((row) => row.get('book_id')), ['book-001', 'book-006', 'book-008']);
+assert.deepEqual(rows(emptyResult).all(), []);
 
 // numeric-aware find through the wrapper ("6.50" matches 6.5; null only matches isNull())
 const listingResult = { rows: listings, rowCount: 2, fields: [{ name: 'listing_id', dataTypeID: 0 }] };

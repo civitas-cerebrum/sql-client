@@ -325,7 +325,7 @@ rows(res).where(row => row.number('price')! < 10);           // predicate
 rows(res).where({ genre: 'Fiction' }).column('title');
 rows(res).where({ book_id: 'b1' }).one();
 if (rows(res).where({ status: 'SOLD' }).isEmpty()) { /* none sold */ }
-for (const row of rows(res)) { /* ResultSet is iterable */ }
+rows(res).where({ genre: 'Fiction' }).all().forEach(r => { /* Row[] */ });
 
 // standalone, on raw rows
 import { filterRows } from '@civitas-cerebrum/sql-client';
@@ -370,7 +370,7 @@ matchers (`eq`/`ne`/`oneOf`) and literal partials compare numerically when both 
 | `.column(name)` | One column across all rows |
 | `.find(where)` | First matching `Row` (partial of literals/matchers, or `(row) => boolean`) |
 | `.where(where)` | Filter → chainable `ResultSet` (same partial/predicate forms) |
-| `.map(fn)` / `.all()` / `.raw()` | Iterate / wrap all / unwrap; `ResultSet` is also `for…of`-iterable |
+| `.map(fn)` / `.all()` / `.raw()` | Map over rows / wrap all as `Row[]` / unwrap to raw rows |
 | `Row<T>.get/string/number/boolean(col)` | Case-insensitive, type-coercing cell access; `T` gives column-name autocomplete |
 | `Row.has(col)` / `Row.raw()` | Presence check / underlying object |
 

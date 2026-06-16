@@ -21,7 +21,6 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
   (Oracle `/` terminator and `BEGIN..END` awareness, SQL Server `GO`).
 - **Typed rows** — `Row<T>` and `ResultSet<T>` now give column-name autocomplete while still allowing
   case-insensitive/arbitrary-string lookups; `ColumnOf<T>` and `SqlLogger` are exported.
-- **`ResultSet` is iterable** — `for…of` yields each `Row`.
 - Richer `QueryFailedException` messages embedding the (truncated) SQL and params, plus a cross-engine
   hint when the placeholder style doesn't match the engine.
 - Debug logging now covers statements executed inside transactions, plus `begin`/`commit`/`rollback`

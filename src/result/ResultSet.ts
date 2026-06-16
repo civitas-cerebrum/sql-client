@@ -74,9 +74,6 @@ export class ResultSet<T extends object = Record<string, unknown>> {
     }
     all(): Row<T>[] { return this._rows.map((r) => new Row(r)); }
     raw(): T[] { return this._rows; }
-    *[Symbol.iterator](): IterableIterator<Row<T>> {
-        for (const r of this._rows) yield new Row(r);
-    }
 }
 
 /** Wrap a SqlResult (or a raw rows array) for ergonomic access. */
