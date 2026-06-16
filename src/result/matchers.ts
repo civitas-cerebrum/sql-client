@@ -10,15 +10,28 @@ function n(v: unknown): number {
 }
 
 /**
+ * Numeric value of a side, or null if it isn't safely numeric. Strings only
+ * count when they're a canonical decimal (`-?digits[.digits]`) — so a DECIMAL
+ * column's "6.50" coerces, but "", whitespace, "0x10", and "1e3" do NOT (those
+ * would otherwise silently equal 0/16/1000 and make an assertion lie).
+ */
+function numericValue(v: unknown): number | null {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v === 'bigint') return Number(v);
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+    return null;
+}
+
+/**
  * Loose equality across engine value representations: when both sides are
- * non-nullish and numeric ("6.50" vs 6.5) compare as numbers, else as strings.
+ * numeric ("6.50" vs 6.5) compare as numbers, else as strings. A non-numeric
+ * string never coerces, so blank/whitespace cells don't spuriously match 0.
  */
 export function looseEquals(a: unknown, b: unknown): boolean {
-    if (!isNullish(a) && !isNullish(b)) {
-        const na = Number(a);
-        const nb = Number(b);
-        if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
-    }
+    const na = numericValue(a);
+    const nb = numericValue(b);
+    if (na !== null && nb !== null) return na === nb;
     return String(a) === String(b);
 }
 

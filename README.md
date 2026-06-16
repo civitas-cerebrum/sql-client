@@ -206,7 +206,8 @@ await db.query(sql`SELECT ${sql.id('title')} FROM books WHERE in_stock = ${true}
 ### Transactions
 
 `transaction(fn)` commits on return and rolls back on throw. The handle carries the dialect, so
-`QueryBuilder.run(tx)` (and `sql` fragments via `tx.query`) work inside it:
+`QueryBuilder.run(tx)` works inside it (the `sql` tag is client-only — inside a tx use the builder
+or raw SQL via `tx.query`):
 
 ```ts
 await pg.transaction(async (tx) => {

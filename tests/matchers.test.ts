@@ -18,6 +18,16 @@ assert.equal(eq(6.5)(null), false);             // null cells only match isNull(
 assert.equal(eq(6.5)(undefined), false);
 assert.equal(ne(6.5)('6.50'), false);
 assert.equal(ne(6.5)('6.51'), true);
+// non-canonical strings must NOT coerce to numbers (else a passing test would lie)
+assert.equal(eq(0)(''), false);                 // empty string is not 0
+assert.equal(eq(0)('   '), false);              // whitespace is not 0
+assert.equal(eq(16)('0x10'), false);            // hex string is not 16
+assert.equal(eq(1000)('1e3'), false);           // exponent string is not 1000
+assert.equal(eq(5)(' 5 '), false);              // padded string is not the number
+assert.equal(eq(true)(1), true);                // booleans still coerce (sqlite/mysql store 1/0)
+assert.equal(eq(false)(0), true);
+assert.equal(oneOf([0])(''), false);            // same guard through oneOf
+assert.equal(eq(-3.5)('-3.50'), true);          // negative decimals still coerce
 
 // numeric comparison (Number coercion; null/NaN → false)
 assert.equal(lt(10)('8.99'), true);
