@@ -33,11 +33,46 @@ jobs:
       - name: 🛠️ Build package
         run: npm run build
 
-      # CI runs the zero-infra suite (compilation unit tests + the in-process SQLite
-      # integration). The full five-engine live matrix (postgres/mysql/mssql/oracle)
-      # is run locally via `docker compose --profile all up -d --wait && npm run test:all-engines`.
+      # Unit + the in-process SQLite integration (zero-infra) across the Node matrix.
+      # The four live engines run in the `integration` job below.
       - name: 🧪 Run Unit + SQLite Tests
         run: npm test
 
       - name: 📝 Check Types
         run: npx tsc --noEmit
+
+  # Live engine integration — one isolated container per engine, in parallel, so a
+  # single runner never hosts more than one database (and one engine failing still
+  # reports the others). Same path as local dev: docker compose profile + test:<engine>.
+  integration:
+    name: 🐳 Integration (${{ matrix.engine }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [postgres, mysql, mssql, oracle]
+
+    steps:
+      - name: 🗂️ Checkout repository
+        uses: actions/checkout@v6
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 🧩 Install dependencies
+        run: npm ci
+
+      - name: 🐳 Start ${{ matrix.engine }}
+        run: docker compose --profile ${{ matrix.engine }} up -d --wait
+
+      - name: 🧪 Run ${{ matrix.engine }} integration tests
+        run: npm run test:${{ matrix.engine }}
+
+      - name: 🧹 Tear down
+        if: always()
+        run: docker compose --profile ${{ matrix.engine }} down -v
