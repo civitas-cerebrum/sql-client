@@ -6,7 +6,10 @@ test-coverage-report.md
 test-coverage-report.txt
 coverage-context/
 
-# Superpowers brainstorming specs & implementation plans — never commit
-docs/superpowers/
+# Internal design / planning docs — kept local, never committed
+docs/
 .superpowers/
 .achilles/
+
+# Local release-note drafts
+release-notes-*.md
