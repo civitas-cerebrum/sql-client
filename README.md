@@ -53,36 +53,26 @@ const top = await QueryBuilder.select('books')
 
 ## 📦 Installation
 
-One install brings **all five engine drivers** — nothing else to add:
+Install the package **plus the driver(s) for your engine(s)** — drivers are **optional peer dependencies**, so you pull only the ones you use (nothing is auto-installed, including for packages that depend on sql-client):
 
 ```sh
-npm install @civitas-cerebrum/sql-client
-```
-
-The drivers (`pg`, `mysql2`, `better-sqlite3`, `mssql`, `oracledb`) ship as **optional dependencies**: npm installs them all by default, but if a native driver can't build on your platform the install still succeeds — that one engine reports a clear error only if you use it, while the rest work. Drivers are also loaded lazily at runtime, so engines you don't touch cost nothing.
-
-### Installing specific engines only
-
-Prefer a slim, single-engine install? Skip the bundled drivers with `--omit=optional` and add just the one(s) you need:
-
-```sh
-# PostgreSQL only
-npm install @civitas-cerebrum/sql-client pg --omit=optional
+# PostgreSQL
+npm install @civitas-cerebrum/sql-client pg
 
 # MySQL / MariaDB
-npm install @civitas-cerebrum/sql-client mysql2 --omit=optional
+npm install @civitas-cerebrum/sql-client mysql2
 
 # SQLite (zero infrastructure)
-npm install @civitas-cerebrum/sql-client better-sqlite3 --omit=optional
+npm install @civitas-cerebrum/sql-client better-sqlite3
 
 # SQL Server
-npm install @civitas-cerebrum/sql-client mssql --omit=optional
+npm install @civitas-cerebrum/sql-client mssql
 
 # Oracle (Thin mode — no Instant Client needed)
-npm install @civitas-cerebrum/sql-client oracledb --omit=optional
+npm install @civitas-cerebrum/sql-client oracledb
 ```
 
-To make it the default for a project, set `omit=optional` in your `.npmrc` and install each driver you want explicitly. Multiple engines: list them all on one line.
+Need several engines? List their drivers together (`npm install @civitas-cerebrum/sql-client pg mysql2`). Importing the package never loads a driver; it's `require`d on first use, and a missing one throws a clear `UnsupportedEngineException` naming the driver to install.
 
 **Requirements:** Node.js ≥ 20.
 
@@ -134,7 +124,7 @@ await db.end();
 ## ✨ Features
 
 * **Engine auto-detection** — The engine is inferred from the connection-string scheme; pass `{ engine }` explicitly only when there's no scheme to read.
-* **Batteries included, lazily loaded** — All five drivers ship as optional dependencies (one `npm install`, every engine), but are `require`d only on first client construction — engines you don't use cost nothing at runtime, and a driver that can't build on your platform degrades gracefully (that engine throws `UnsupportedEngineException`; the rest work).
+* **Optional, lazily-loaded drivers** — Drivers are optional peer deps: install only the engine(s) you use; nothing is forced on you (or on packages that depend on sql-client). Each is `require`d on first client construction, and a missing one throws `UnsupportedEngineException` naming the driver to install.
 * **Always parametrised** — Raw calls take a params array; the builder takes `?` markers and renders the engine-correct placeholder style. No string interpolation anywhere.
 * **`sql` tagged template** — `` sql`... ${value}` `` interpolates safely as bind parameters and compiles to the right placeholder style per engine; `sql.id()` for identifiers, fragments nest.
 * **Fluent query builder** — `select`/`insert`/`update`/`delete` chains with engine-correct identifier quoting and pagination (`LIMIT/OFFSET` vs `OFFSET..FETCH`), plus `whereIn`/`whereNull`/`whereNotNull` and `count()`/`exists()` terminals.
