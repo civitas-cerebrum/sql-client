@@ -33,6 +33,12 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
   iteration still work.
 - **BREAKING: `QueryBuilder.toSql(dialect)` now requires an explicit dialect** (it previously defaulted
   to Postgres, which silently produced wrong SQL for other engines).
+- **Engine drivers are now bundled.** The five drivers (`pg`, `mysql2`, `better-sqlite3`, `mssql`,
+  `oracledb`) moved from optional peer dependencies to **`optionalDependencies`**, so
+  `npm install @civitas-cerebrum/sql-client` installs all engines by default. A native driver that
+  can't build on a platform is skipped without failing the install (that engine errors only when
+  used), and drivers still load lazily at runtime. To install a single engine, use
+  `npm install @civitas-cerebrum/sql-client <driver> --omit=optional`.
 - **BREAKING: minimum Node bumped to `>=20`** (Node 18 is EOL and the SQLite driver no longer installs
   on it); CI now tests Node 20, 22, and 24.
 - Transaction handles passed to `transaction(fn)` now carry `dialect` and `engine`, so
