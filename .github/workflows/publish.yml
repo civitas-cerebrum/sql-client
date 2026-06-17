@@ -10,8 +10,45 @@ permissions:
   contents: read
 
 jobs:
+  # Gate the release on the full live-engine matrix. The PR `test` job's unit+SQLite
+  # run doesn't fire on tag pushes, so the publish pipeline runs the engines itself —
+  # one isolated container per engine; any failure blocks the publish job.
+  integration:
+    name: 🐳 Integration (${{ matrix.engine }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: true
+      matrix:
+        engine: [postgres, mysql, mssql, oracle]
+
+    steps:
+      - name: 🗂️  Checkout repository
+        uses: actions/checkout@v6
+
+      - name: ⚙️  Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 🧩  Install dependencies
+        run: npm ci
+
+      - name: 🐳  Start ${{ matrix.engine }}
+        run: docker compose --profile ${{ matrix.engine }} up -d --wait
+
+      - name: 🧪  Run ${{ matrix.engine }} integration tests
+        run: npm run test:${{ matrix.engine }}
+
+      - name: 🧹  Tear down
+        if: always()
+        run: docker compose --profile ${{ matrix.engine }} down -v
+
   publish:
     runs-on: ubuntu-latest
+    needs: integration
 
     steps:
       - name: 🗂️  Checkout repository
