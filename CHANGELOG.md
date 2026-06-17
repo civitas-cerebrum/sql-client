@@ -4,6 +4,17 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2]
+
+### Changed
+
+- **Engine drivers are optional peer dependencies again** (reverting 0.1.1's `optionalDependencies`).
+  `optionalDependencies` install **transitively**, so 0.1.1 forced all five drivers (two native) onto every
+  package that depends on sql-client — e.g. `@civitas-cerebrum/element-interactions` consumers. Optional peer
+  deps are not auto-installed (standalone or transitively): install the package plus the driver(s) for the
+  engine(s) you use (`npm install @civitas-cerebrum/sql-client pg`). Drivers still load lazily, and a missing
+  one throws `UnsupportedEngineException` naming the driver to install.
+
 ## [0.1.1] — 2026-06-16
 
 ### Added
@@ -72,5 +83,6 @@ Oracle) with engine auto-detection, lazy optional-peer-dependency drivers, a flu
 coercing accessors, in-memory row matchers, transactions, typed exceptions, `DEBUG=sql:*` logging, and
 a bundled Claude Code skill.
 
+[0.1.2]: https://github.com/civitas-cerebrum/sql-client/releases/tag/0.1.2
 [0.1.1]: https://github.com/civitas-cerebrum/sql-client/releases/tag/0.1.1
 [0.1.0]: https://github.com/civitas-cerebrum/sql-client/releases/tag/0.1.0
