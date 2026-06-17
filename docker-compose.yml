@@ -30,10 +30,16 @@ services:
       - ./tests/sql/mysql.schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./tests/sql/mysql.seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ubookhive", "-pbookhive"]
+      # Query the seeded DB over TCP (-h127.0.0.1), not the socket: `mysqladmin ping`
+      # via the socket passes against MySQL's init-phase temp server, after which the
+      # real server restarts and drops connections (a CI race). A TCP SELECT against a
+      # seeded table only succeeds once init is done and the real server is accepting
+      # connections — so `--wait` returns on a genuinely ready database.
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -ubookhive -pbookhive -e 'SELECT 1 FROM books LIMIT 1' bookhive"]
       interval: 3s
       timeout: 5s
-      retries: 30
+      retries: 40
+      start_period: 30s
 
   sql-client-mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
