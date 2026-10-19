@@ -48,22 +48,18 @@ This skill is the consumer-facing usage guide. If a signature or option shape is
 
 ## Install
 
-All five engine drivers (`pg`, `mysql2`, `better-sqlite3`, `mssql`, `oracledb`) ship with the package as **optional dependencies** — one install, every engine:
+The engine drivers are **optional peer dependencies** — install the package plus only the driver(s) for the engine(s) you use (nothing is auto-installed, including transitively for packages that depend on sql-client):
 
 ```sh
-npm install @civitas-cerebrum/sql-client
+npm install @civitas-cerebrum/sql-client pg              # PostgreSQL
+npm install @civitas-cerebrum/sql-client mysql2          # MySQL / MariaDB
+npm install @civitas-cerebrum/sql-client better-sqlite3  # SQLite (zero infrastructure)
+npm install @civitas-cerebrum/sql-client mssql           # SQL Server
+npm install @civitas-cerebrum/sql-client oracledb        # Oracle (Thin mode)
 ```
 
-npm installs all five by default; a native driver that can't build on the platform is skipped without failing the install (that engine then errors only when used).
-
-Specific engine(s) only — skip the bundle with `--omit=optional` and name the driver(s):
-
-```sh
-npm install @civitas-cerebrum/sql-client pg --omit=optional              # Postgres only
-npm install @civitas-cerebrum/sql-client mysql2 better-sqlite3 --omit=optional  # MySQL + SQLite
-```
-
-Importing the package never loads a native driver; the driver is `require`d when the first client for that engine is constructed. A missing/unbuildable driver throws `UnsupportedEngineException` with an install hint.
+Multiple engines: list the drivers together (`npm install @civitas-cerebrum/sql-client pg mysql2`).
+Importing the package never loads a driver; it's `require`d when the first client for that engine is constructed. A missing driver throws `UnsupportedEngineException` naming the driver to install.
 
 ## Connecting
 

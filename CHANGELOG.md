@@ -10,6 +10,17 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
 
 - **postinstall scope** — the skill now installs to `~/.claude/skills` only on `npm i -g`, and only to `<project>/.claude/skills` on a local install (nothing is written if the project root has no `package.json` or lies inside npm's global prefix); it no longer writes both locations or into npm's `lib/.claude`.
 
+## [0.1.2]
+
+### Changed
+
+- **Engine drivers are optional peer dependencies again** (reverting 0.1.1's `optionalDependencies`).
+  `optionalDependencies` install **transitively**, so 0.1.1 forced all five drivers (two native) onto every
+  package that depends on sql-client — e.g. `@civitas-cerebrum/element-interactions` consumers. Optional peer
+  deps are not auto-installed (standalone or transitively): install the package plus the driver(s) for the
+  engine(s) you use (`npm install @civitas-cerebrum/sql-client pg`). Drivers still load lazily, and a missing
+  one throws `UnsupportedEngineException` naming the driver to install.
+
 ## [0.1.1] — 2026-06-16
 
 ### Added
@@ -78,5 +89,6 @@ Oracle) with engine auto-detection, lazy optional-peer-dependency drivers, a flu
 coercing accessors, in-memory row matchers, transactions, typed exceptions, `DEBUG=sql:*` logging, and
 a bundled Claude Code skill.
 
+[0.1.2]: https://github.com/civitas-cerebrum/sql-client/releases/tag/0.1.2
 [0.1.1]: https://github.com/civitas-cerebrum/sql-client/releases/tag/0.1.1
 [0.1.0]: https://github.com/civitas-cerebrum/sql-client/releases/tag/0.1.0

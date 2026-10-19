@@ -1,6 +1,6 @@
 {
   "name": "@civitas-cerebrum/sql-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A lightweight multi-engine SQL client (Postgres, MySQL, SQLite, SQL Server, Oracle) with a fluent query builder, typed results, and parametrised queries.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,15 +47,27 @@
     "@types/node": "^25.9.3",
     "@types/oracledb": "^7.0.1",
     "@types/pg": "^8.11.0",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
-  },
-  "optionalDependencies": {
     "better-sqlite3": "^12.10.0",
     "mssql": "^12.5.5",
     "mysql2": "^3.22.4",
     "oracledb": "^7.0.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "*",
+    "mssql": "*",
+    "mysql2": "*",
+    "oracledb": "*",
+    "pg": "*"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": { "optional": true },
+    "mssql": { "optional": true },
+    "mysql2": { "optional": true },
+    "oracledb": { "optional": true },
+    "pg": { "optional": true }
   },
   "keywords": [
     "postgres",
