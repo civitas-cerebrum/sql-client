@@ -4,6 +4,12 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **postinstall scope** — the skill now installs to `~/.claude/skills` only on `npm i -g`, and only to `<project>/.claude/skills` on a local install (nothing is written if the project root has no `package.json` or lies inside npm's global prefix); it no longer writes both locations or into npm's `lib/.claude`.
+
 ## [0.1.2]
 
 ### Changed

@@ -462,8 +462,7 @@ Deliberately out of scope to stay lean and predictable. For these, reach for a d
 ## 🤖 Claude Code Skill
 
 The package ships a [Claude Code](https://claude.com/claude-code) skill (`skills/sql-client/SKILL.md`)
-that teaches the agent the full API surface. It installs automatically into `.claude/skills/`
-(project + user level) on `npm install` — whether the package is installed directly or arrives
+that teaches the agent the full API surface. It installs automatically on `npm install` — into `~/.claude/skills/` for a global install (`-g`), or only `<project>/.claude/skills/` for a local one (never written when the project root has no `package.json`) — whether the package is installed directly or arrives
 transitively through another `@civitas-cerebrum` package. In projects using the Steps-API test
 frameworks, the skill defers test-spec database work to their `database-testing` skill.
 
