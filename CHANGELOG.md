@@ -6,6 +6,11 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: minimum Node bumped to `>=24`** (Node 20 is EOL, and current `mssql`/`tedious` releases need
+  `Promise.withResolvers`, which Node 20 lacks); CI and publish now run on Node 24 only.
+
 ### Fixed
 
 - **postinstall scope** — the skill now installs to `~/.claude/skills` only on `npm i -g`, and only to `<project>/.claude/skills` on a local install (nothing is written if the project root has no `package.json` or lies inside npm's global prefix); it no longer writes both locations or into npm's `lib/.claude`.
