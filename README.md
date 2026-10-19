@@ -423,7 +423,7 @@ npm run test:all-engines
 docker compose --profile all down -v
 ```
 
-The commands above are for local iteration. **CI runs everything on every PR**: the unit + SQLite suite across Node 20/22/24, *and* the full four-engine live matrix (Postgres, MySQL, SQL Server, Oracle) — each engine in its own isolated container — so engine-specific regressions are caught before merge.
+The commands above are for local iteration. **CI runs everything on every PR**: the unit + SQLite suite on Node 24, *and* the full four-engine live matrix (Postgres, MySQL, SQL Server, Oracle) — each engine in its own isolated container — so engine-specific regressions are caught before merge.
 
 Host ports collide with something already running? Override them:
 `SQL_CLIENT_PG_PORT`, `SQL_CLIENT_MYSQL_PORT`, `SQL_CLIENT_MSSQL_PORT`, `SQL_CLIENT_ORACLE_PORT`
