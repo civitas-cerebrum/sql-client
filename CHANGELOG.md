@@ -6,6 +6,8 @@ All notable changes to `@civitas-cerebrum/sql-client` are documented here. The f
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-10-23
+
 ### Changed
 
 - **BREAKING: minimum Node bumped to `>=24`** (Node 20 is EOL, and current `mssql`/`tedious` releases need
